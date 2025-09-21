@@ -1,0 +1,11 @@
+-DCPU_S32K144HFT0VLLT
+-I"D:/Course_Online/MCU_S32K/workspace/BT01_blinked_led_3s/include"
+-O0
+-g3
+-Wall
+-c
+-fmessage-length=0
+-ffunction-sections
+-fdata-sections
+-mcpu=cortex-m4
+-specs=rdimon.specs
