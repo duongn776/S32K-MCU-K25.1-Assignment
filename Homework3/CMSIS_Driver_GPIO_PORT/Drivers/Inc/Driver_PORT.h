@@ -1,0 +1,270 @@
+/*
+ * Driver_PORT.h
+ *
+ *  Created on: Sep 21, 2025
+ *      Author: nhduo
+ */
+
+#ifndef INC_DRIVER_PORT_H_
+#define INC_DRIVER_PORT_H_
+
+#include "S32K144.h"
+#include "HWAccess_PORT.h"
+/* Alias for PORTx */
+#define PORTA   IP_PORTA
+#define PORTB   IP_PORTB
+#define PORTC   IP_PORTC
+#define PORTD   IP_PORTD
+#define PORTE   IP_PORTE
+
+/* Alias for PCC */
+#define PCC		IP_PCC
+
+#define PORT_OUTPUT 1
+#define PORT_INPUT  0
+
+#define ENABLE 	1
+#define DISABLE 0
+/**
+  * @brief  PORT Init structure definition
+  */
+typedef struct
+{
+    PORT_Type *portBase;   /*!< PORTx base (PORTA..PORTE) */
+
+    uint32_t   pin;        /*!< Specifies the pin muxing.
+    							      This parameter can be a value of @ref PORT_pin_define */
+
+    uint32_t   mux;        /*!< Specifies the pin muxing.
+                                This parameter can be a value of @ref PORT_mux_define */
+
+    uint32_t   pull;       /*!< Specifies Pull-Up or Pull-Down.
+                                This parameter can be a value of @ref PORT_pull_define */
+    uint32_t   interrupt;  /*!< Specifies the pin interrupt.
+                                This parameter can be a value of @ref PORT_interrupts_define */
+} PORT_Config_t;
+
+/** @defgroup PORT_mux_define  PORT mux define
+  * @{
+  */
+#define PORT_MUX_DISABLED             (0U)
+#define PORT_MUX_GPIO                 (1U)
+#define PORT_MUX_ALT2                 (2U)
+#define PORT_MUX_ALT3                 (3U)
+#define PORT_MUX_ALT4                 (4U)
+#define PORT_MUX_ALT5                 (5U)
+#define PORT_MUX_ALT6                 (6U)
+#define PORT_MUX_ALT7                 (7U)
+/**
+  * @}
+  */
+
+/** @defgroup PORT_pull_define PORT pull define
+  * @brief PORT Pull-Up or Pull-Down Activation
+  * @{
+  */
+#define PORT_NOPULL        (0)   /*!< No Pull-up or Pull-down activation  */
+#define PORT_PULLUP        (1)   /*!< Pull-up activation                  */
+#define PORT_PULLDOWN      (2)   /*!< Pull-down activation                */
+/**
+  * @}
+  */
+
+/** @defgroup PORT_pins_define  PORT pins define
+  * @{
+  */
+
+/* ===== PORT A (0–31) ===== */
+#define PA0   (0)
+#define PA1   (1)
+#define PA2   (2)
+#define PA3   (3)
+#define PA4   (4)
+#define PA5   (5)
+#define PA6   (6)
+#define PA7   (7)
+#define PA8   (8)
+#define PA9   (9)
+#define PA10  (10)
+#define PA11  (11)
+#define PA12  (12)
+#define PA13  (13)
+#define PA14  (14)
+#define PA15  (15)
+#define PA16  (16)
+#define PA17  (17)
+#define PA18  (18)
+#define PA19  (19)
+#define PA20  (20)
+#define PA21  (21)
+#define PA22  (22)
+#define PA23  (23)
+#define PA24  (24)
+#define PA25  (25)
+#define PA26  (26)
+#define PA27  (27)
+#define PA28  (28)
+#define PA29  (29)
+#define PA30  (30)
+#define PA31  (31)
+
+/* ===== PORT B (32–63) ===== */
+#define PB0   (32)
+#define PB1   (33)
+#define PB2   (34)
+#define PB3   (35)
+#define PB4   (36)
+#define PB5   (37)
+#define PB6   (38)
+#define PB7   (39)
+#define PB8   (40)
+#define PB9   (41)
+#define PB10  (42)
+#define PB11  (43)
+#define PB12  (44)
+#define PB13  (45)
+#define PB14  (46)
+#define PB15  (47)
+#define PB16  (48)
+#define PB17  (49)
+#define PB18  (50)
+#define PB19  (51)
+#define PB20  (52)
+#define PB21  (53)
+#define PB22  (54)
+#define PB23  (55)
+#define PB24  (56)
+#define PB25  (57)
+#define PB26  (58)
+#define PB27  (59)
+#define PB28  (60)
+#define PB29  (61)
+#define PB30  (62)
+#define PB31  (63)
+
+/* ===== PORT C (64–95) ===== */
+#define PC0   (64)
+#define PC1   (65)
+#define PC2   (66)
+#define PC3   (67)
+#define PC4   (68)
+#define PC5   (69)
+#define PC6   (70)
+#define PC7   (71)
+#define PC8   (72)
+#define PC9   (73)
+#define PC10  (74)
+#define PC11  (75)
+#define PC12  (76)
+#define PC13  (77)
+#define PC14  (78)
+#define PC15  (79)
+#define PC16  (80)
+#define PC17  (81)
+#define PC18  (82)
+#define PC19  (83)
+#define PC20  (84)
+#define PC21  (85)
+#define PC22  (86)
+#define PC23  (87)
+#define PC24  (88)
+#define PC25  (89)
+#define PC26  (90)
+#define PC27  (91)
+#define PC28  (92)
+#define PC29  (93)
+#define PC30  (94)
+#define PC31  (95)
+
+/* ===== PORT D (96–127) ===== */
+#define PD0   (96)
+#define PD1   (97)
+#define PD2   (98)
+#define PD3   (99)
+#define PD4   (100)
+#define PD5   (101)
+#define PD6   (102)
+#define PD7   (103)
+#define PD8   (104)
+#define PD9   (105)
+#define PD10  (106)
+#define PD11  (107)
+#define PD12  (108)
+#define PD13  (109)
+#define PD14  (110)
+#define PD15  (111)
+#define PD16  (112)
+#define PD17  (113)
+#define PD18  (114)
+#define PD19  (115)
+#define PD20  (116)
+#define PD21  (117)
+#define PD22  (118)
+#define PD23  (119)
+#define PD24  (120)
+#define PD25  (121)
+#define PD26  (122)
+#define PD27  (123)
+#define PD28  (124)
+#define PD29  (125)
+#define PD30  (126)
+#define PD31  (127)
+
+/* ===== PORT E (128–159) ===== */
+#define PE0   (128)
+#define PE1   (129)
+#define PE2   (130)
+#define PE3   (131)
+#define PE4   (132)
+#define PE5   (133)
+#define PE6   (134)
+#define PE7   (135)
+#define PE8   (136)
+#define PE9   (137)
+#define PE10  (138)
+#define PE11  (139)
+#define PE12  (140)
+#define PE13  (141)
+#define PE14  (142)
+#define PE15  (143)
+#define PE16  (144)
+#define PE17  (145)
+#define PE18  (146)
+#define PE19  (147)
+#define PE20  (148)
+#define PE21  (149)
+#define PE22  (150)
+#define PE23  (151)
+#define PE24  (152)
+#define PE25  (153)
+#define PE26  (154)
+#define PE27  (155)
+#define PE28  (156)
+#define PE29  (157)
+#define PE30  (158)
+#define PE31  (159)
+
+
+
+/** @defgroup PORT_interrupts_define  PORT interrupts define
+  * @{
+  */
+#define PORT_INT_DISABLED      (0b0000U)
+#define PORT_INT_DMA_RISING    (0b0001U)
+#define PORT_INT_DMA_FALLING   (0b0010U)
+#define PORT_INT_DMA_EITHER    (0b0011U)
+#define PORT_INT_LOGIC_ZERO    (0b1000U)
+#define PORT_INT_RISING_EDGE   (0b1001U)
+#define PORT_INT_FALLING_EDGE  (0b1010U)
+#define PORT_INT_EITHER_EDGE   (0b1011U)
+#define PORT_INT_LOGIC_ONE     (0b1100U)
+
+/**
+  * @}
+  */
+
+/* API functions */
+void PORT_Init(const PORT_Config_t *cfg);
+void PORT_PeriClockControl(PORT_Type *base, uint8_t clockState);
+
+#endif /* INC_DRIVER_PORT_H_ */
