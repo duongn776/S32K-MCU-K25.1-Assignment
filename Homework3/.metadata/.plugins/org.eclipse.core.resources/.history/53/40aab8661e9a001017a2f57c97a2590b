@@ -1,0 +1,27 @@
+#include "Driver_PORT.h"
+#include "Driver_GPIO.h"
+#include "core_cm4.h"
+
+#define BTN			12
+#define BTN1		13
+#define LED_RED		0
+#define LED_GREEN	15
+
+
+// --- ISR cho PORTC ---
+void PORTC_IRQHandler(void) {
+    uint32_t isfr = PORTC->ISFR;   // Lấy cờ interrupt
+
+    // Check SW2 (PTC12)
+    if (isfr & (1 << 12)) {
+        GPIO_TogglePin(IP_PTD, 0);     // Toggle LED đỏ (PD0)
+        PORTC->ISFR = (1 << 12);       // Clear flag
+    }
+
+    // Check SW3 (PTC13)
+    if (isfr & (1 << 13)) {
+        GPIO_TogglePin(IP_PTD, 15);    // Toggle LED xanh (PD15)
+        PORTC->ISFR = (1 << 13);       // Clear flag
+    }
+}
+

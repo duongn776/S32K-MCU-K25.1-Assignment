@@ -1,0 +1,12 @@
+description.autobuilding=false
+eclipse.preferences.version=1
+encoding=UTF-8
+pathvariable.FREEMASTER_S32K116_2_0_0_PATH=C\:/NXP/S32DS.3.6.3/S32DS/software/FreeMASTER_Serial_Communication_Driver_V2_0
+pathvariable.FREEMASTER_S32K118_2_0_0_PATH=C\:/NXP/S32DS.3.6.3/S32DS/software/FreeMASTER_Serial_Communication_Driver_V2_0
+pathvariable.FREEMASTER_S32K142W_2_0_0_PATH=C\:/NXP/S32DS.3.6.3/S32DS/software/FreeMASTER_Serial_Communication_Driver_V2_0
+pathvariable.FREEMASTER_S32K142_2_0_0_PATH=C\:/NXP/S32DS.3.6.3/S32DS/software/FreeMASTER_Serial_Communication_Driver_V2_0
+pathvariable.FREEMASTER_S32K144W_2_0_0_PATH=C\:/NXP/S32DS.3.6.3/S32DS/software/FreeMASTER_Serial_Communication_Driver_V2_0
+pathvariable.FREEMASTER_S32K144_2_0_0_PATH=C\:/NXP/S32DS.3.6.3/S32DS/software/FreeMASTER_Serial_Communication_Driver_V2_0
+pathvariable.FREEMASTER_S32K146_2_0_0_PATH=C\:/NXP/S32DS.3.6.3/S32DS/software/FreeMASTER_Serial_Communication_Driver_V2_0
+pathvariable.FREEMASTER_S32K148_2_0_0_PATH=C\:/NXP/S32DS.3.6.3/S32DS/software/FreeMASTER_Serial_Communication_Driver_V2_0
+version=1

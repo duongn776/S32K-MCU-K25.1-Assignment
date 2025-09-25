@@ -1,0 +1,45 @@
+#include "Driver_PORT.h"
+#include "Driver_GPIO.h"
+#include "core_cm4.h"
+
+#define BTN			12
+#define BTN1		13
+#define LED_RED		0
+#define LED_GREEN	15
+
+
+/* Callback cho Button */
+void Button_Event(uint32_t event) {
+    if (event == 1) { // giả sử event=1 cho SW2
+        Driver_GPIO0.SetOutput(PD0, 1 ^ Driver_GPIO0.GetInput(PD0));  // toggle LED đỏ
+    }
+    else if (event == 2) { // giả sử event=2 cho SW3
+        Driver_GPIO0.SetOutput(PD15, 1 ^ Driver_GPIO0.GetInput(PD15)); // toggle LED xanh
+    }
+}
+
+int main(void) {
+    /* --- Config LED đỏ (PD0) --- */
+    Driver_GPIO0.Setup(PD0, NULL);
+    Driver_GPIO0.SetDirection(PD0, ARM_GPIO_OUTPUT);
+
+    /* --- Config LED xanh (PD15) --- */
+    Driver_GPIO0.Setup(PD15, NULL);
+    Driver_GPIO0.SetDirection(PD15, ARM_GPIO_OUTPUT);
+
+    /* --- Config Button SW2 (PC12) --- */
+    Driver_GPIO0.Setup(PC12, Button_Event);
+    Driver_GPIO0.SetDirection(PC12, ARM_GPIO_INPUT);
+    Driver_GPIO0.SetPullResistor(PC12, ARM_GPIO_PULL_UP);
+    Driver_GPIO0.SetEventTrigger(PC12, ARM_GPIO_TRIGGER_FALLING_EDGE);
+
+    /* --- Config Button SW3 (PC13) --- */
+    Driver_GPIO0.Setup(PC13, Button_Event);
+    Driver_GPIO0.SetDirection(PC13, ARM_GPIO_INPUT);
+    Driver_GPIO0.SetPullResistor(PC13, ARM_GPIO_PULL_UP);
+    Driver_GPIO0.SetEventTrigger(PC13, ARM_GPIO_TRIGGER_FALLING_EDGE);
+
+    while (1) {
+        /* app chạy vòng lặp vô tận, interrupt sẽ gọi Button_Event */
+    }
+}

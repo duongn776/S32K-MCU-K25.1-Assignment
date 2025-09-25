@@ -1,0 +1,75 @@
+#include "Driver_PORT.h"
+#include "Driver_GPIO.h"
+#include "core_cm4.h"
+
+#define LED_RED     PD15
+#define LED_GREEN   PD16
+#define BTN1     	PC12
+#define BNT2     	PC13
+
+extern ARM_DRIVER_GPIO Driver_GPIO0;
+
+/* Prototype callback */
+void Button_Event(uint32_t event);
+
+/* Callback cho Button */
+void Button_Event(uint32_t event) {
+    if (event == 1) {
+        /* Toggle LED RED */
+        uint32_t state = Driver_GPIO0.GetInput(LED_RED);
+        Driver_GPIO0.SetOutput(LED_RED, !state);
+    }
+    else if (event == 2) {
+        /* Toggle LED GREEN */
+        uint32_t state = Driver_GPIO0.GetInput(LED_GREEN);
+        Driver_GPIO0.SetOutput(LED_GREEN, !state);
+    }
+}
+
+int main(void) {
+
+    /* --- Config LED RED (PD15) --- */
+    Driver_GPIO0.Setup(LED_RED, NULL);
+    Driver_GPIO0.SetDirection(LED_RED, ARM_GPIO_OUTPUT);
+
+    /* --- Config LED GREEN (PD16) --- */
+    Driver_GPIO0.Setup(LED_GREEN, NULL);
+    Driver_GPIO0.SetDirection(LED_GREEN, ARM_GPIO_OUTPUT);
+
+    /* --- Config Button BTN1 (PC12) --- */
+    Driver_GPIO0.Setup(BTN1, NULL);
+    Driver_GPIO0.SetDirection(BTN1, ARM_GPIO_INPUT);
+    Driver_GPIO0.SetPullResistor(BTN1, ARM_GPIO_PULL_UP);
+    Driver_GPIO0.SetEventTrigger(BTN1, ARM_GPIO_TRIGGER_FALLING_EDGE);
+
+    /* --- Config Button BTN2 (PC13) --- */
+    Driver_GPIO0.Setup(BNT2, NULL);
+    Driver_GPIO0.SetDirection(BNT2, ARM_GPIO_INPUT);
+    Driver_GPIO0.SetPullResistor(BNT2, ARM_GPIO_PULL_UP);
+    Driver_GPIO0.SetEventTrigger(BNT2, ARM_GPIO_TRIGGER_FALLING_EDGE);
+
+    /* Turn off LED RED and GREEN */
+    GPIO_SetPin(IP_PTD, 15);
+    GPIO_SetPin(IP_PTD, 16);
+
+    /* Config NVIC for PORTC */
+    NVIC_ClearPendingIRQ(PORTC_IRQn);
+    NVIC_EnableIRQ(PORTC_IRQn);
+    NVIC_SetPriority(PORTC_IRQn, 2);
+
+    while (1);
+}
+
+/* ISR cho PORTC */
+void PORTC_IRQHandler(void) {
+    uint32_t isfr = PORTC->ISFR;
+
+    if (isfr & (1 << 12)) {
+        Button_Event(1);
+        PORTC->ISFR = (1 << 12);
+    }
+    if (isfr & (1 << 13)) {
+        Button_Event(2);
+        PORTC->ISFR = (1 << 13);
+    }
+}

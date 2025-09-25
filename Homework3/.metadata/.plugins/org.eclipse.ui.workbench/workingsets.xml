@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<workingSetManager>
+<workingSet editPageId="org.eclipse.jdt.internal.ui.DynamicSourcesWorkingSet" factoryID="org.eclipse.ui.internal.WorkingSetFactory" id="1758805784606_0" label="Java Main Sources" name="Java Main Sources"/>
+<workingSet editPageId="org.eclipse.jdt.internal.ui.DynamicSourcesWorkingSet" factoryID="org.eclipse.ui.internal.WorkingSetFactory" id="1758805784635_1" label="Java Test Sources" name="Java Test Sources"/>
+<workingSet factoryID="org.eclipse.ui.internal.WorkingSetFactory" id="1758805863563_3" label="CMSIS_Driver_GPIO_PORT" name="CMSIS_Driver_GPIO_PORT">
+<item factoryID="org.eclipse.ui.internal.model.ResourceFactory" path="/CMSIS_Driver_GPIO_PORT" type="4"/>
+</workingSet>
+<workingSet aggregate="true" factoryID="org.eclipse.ui.internal.WorkingSetFactory" id="1758805785818_2" label="Window Working Set" name="Aggregate for window 1758805785818"/>
+</workingSetManager>

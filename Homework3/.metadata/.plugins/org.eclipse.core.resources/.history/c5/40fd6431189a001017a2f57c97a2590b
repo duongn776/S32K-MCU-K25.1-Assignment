@@ -1,0 +1,88 @@
+#include "Driver_PORT.h"
+#include "Driver_GPIO.h"
+#define __MPU_PRESENT 0
+#include "core_cm4.h"
+void delay(volatile uint32_t count) {
+    while (count--) {
+        __asm("NOP");   // tránh tối ưu hóa
+    }
+}
+
+// --- ISR cho PORTC ---
+void PORTC_IRQHandler(void) {
+    uint32_t isfr = PORTC->ISFR;   // Lấy cờ interrupt
+
+    // Check SW2 (PTC12)
+    if (isfr & (1 << 12)) {
+        GPIO_TogglePin(IP_PTD, 0);     // Toggle LED đỏ (PD0)
+        PORTC->ISFR = (1 << 12);       // Clear flag
+    }
+
+    // Check SW3 (PTC13)
+    if (isfr & (1 << 13)) {
+        GPIO_TogglePin(IP_PTD, 15);    // Toggle LED xanh (PD15)
+        PORTC->ISFR = (1 << 13);       // Clear flag
+    }
+}
+
+int main(void) {
+    // Enable clock cho PORTC, PORTD
+    PORT_PeriClockControl(PORTC, ENABLE);
+    PORT_PeriClockControl(PORTD, ENABLE);
+
+    // --- LED Red (PD0) ---
+    PORT_Config_t led_red_cfg = {
+        .portBase  = PORTD,
+        .pin       = 0,
+        .mux       = PORT_MUX_GPIO,
+        .pull      = PORT_NOPULL,
+        .interrupt = PORT_INT_DISABLED
+    };
+    PORT_Init(&led_red_cfg);
+    GPIO_SetPinDirection(IP_PTD, 0, 1);
+    GPIO_SetPin(IP_PTD, 0);   // OFF (active low)
+
+    // --- LED Green (PD15) ---
+    PORT_Config_t led_green_cfg = {
+        .portBase  = PORTD,
+        .pin       = 15,
+        .mux       = PORT_MUX_GPIO,
+        .pull      = PORT_NOPULL,
+        .interrupt = PORT_INT_DISABLED
+    };
+    PORT_Init(&led_green_cfg);
+    GPIO_SetPinDirection(IP_PTD, 15, 1);
+    GPIO_SetPin(IP_PTD, 15);  // OFF (active low)
+
+    // --- Button SW2 (PTC12) ---
+    PORT_Config_t btn1_cfg = {
+        .portBase  = PORTC,
+        .pin       = 12,
+        .mux       = PORT_MUX_GPIO,
+        .pull      = PORT_PULLUP,
+        .interrupt = PORT_INT_FALLING_EDGE   // interrupt khi nhấn (active low)
+    };
+    PORT_Init(&btn1_cfg);
+    GPIO_SetPinDirection(IP_PTC, 12, 0);  // Input
+
+    // --- Button SW3 (PTC13) ---
+    PORT_Config_t btn2_cfg = {
+        .portBase  = PORTC,
+        .pin       = 13,
+        .mux       = PORT_MUX_GPIO,
+        .pull      = PORT_PULLUP,
+        .interrupt = PORT_INT_FALLING_EDGE
+    };
+    PORT_Init(&btn2_cfg);
+    GPIO_SetPinDirection(IP_PTC, 13, 0);  // Input
+
+    // Enable NVIC cho PORTC
+    NVIC_ClearPendingIRQ(PORTC_IRQn);
+    NVIC_EnableIRQ(PORTC_IRQn);
+    NVIC_SetPriority(PORTC_IRQn, 2);
+
+    while (1) {
+        // Main loop rảnh, không cần polling button nữa
+        __WFI();   // Wait for interrupt (tiết kiệm điện)
+    }
+}
