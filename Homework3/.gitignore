@@ -1,1 +1,11 @@
-/.metadata/
+# Eclipse/IDE metadata
+.metadata/
+
+# FreeRTOS logs
+FreeRTOS_TAD_logs/
+
+# Zephyr RTOS logs
+ZephyrRTOS_TAD_logs/
+
+# Temporary files from remote system plugins
+RemoteSystemsTempFiles/
