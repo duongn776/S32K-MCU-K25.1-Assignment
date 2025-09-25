@@ -1,6 +1,0 @@
--c
--I"D:/Course_Online/MCU_S32K/assignment/BT3/PORT_GPIO_Driver/include"
--x assembler-with-cpp
--g3
--mcpu=cortex-m4
--specs=rdimon.specs
