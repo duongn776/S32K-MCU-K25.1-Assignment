@@ -1,11 +1,8 @@
-# Eclipse/IDE metadata
-.metadata/
+# Ignore everything
+/*
 
-# FreeRTOS logs
-FreeRTOS_TAD_logs/
+# Keep .gitignore itself
+!.gitignore
 
-# Zephyr RTOS logs
-ZephyrRTOS_TAD_logs/
-
-# Temporary files from remote system plugins
-RemoteSystemsTempFiles/
+# Keep CMSIS_Driver_GPIO_PORT folder
+!/CMSIS_Driver_GPIO_PORT/

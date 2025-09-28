@@ -1,7 +1,0 @@
--c
--I"D:/Course_Online/MCU_S32K/assignment/Homework3/CMSIS_Driver_GPIO_PORT/include"
--x assembler-with-cpp
--DSTART_FROM_FLASH
--g3
--mcpu=cortex-m4
--specs=rdimon.specs
