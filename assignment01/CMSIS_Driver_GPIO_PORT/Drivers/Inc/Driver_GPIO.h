@@ -9,9 +9,7 @@
 #define INC_DRIVER_GPIO_H_
 
 #include "Driver_Common.h"
-#include "HWAccess_GPIO.h"
-#include "HWAccess_PORT.h"
-#include "Driver_PORT.h"
+#include "HAL_GPIO.h"
 /**
 \brief GPIO Pin
 */

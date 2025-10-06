@@ -1,89 +1,120 @@
-#include "Driver_PORT.h"
+/******************************************************************************
+ * File:    main.c
+ * Author:  Nguyen Hoang Duong
+ * Date:    04/10/2025
+ * Target:  NXP S32K144 MCU
+ * Tool:    S32 Design Studio
+ *
+ * Description:
+ *   Toggle LED when button is pressed using CMSIS Driver GPIO interrupt
+ ******************************************************************************/
+
 #include "Driver_GPIO.h"
 #include "core_cm4.h"
 
-/* Pin definitions */
-#define LED_RED     PD16
-#define LED_GREEN   PD15
-#define BTN1     	PC12
-#define BNT2     	PC13
+/*******************************************************************************
+ * Definitions
+ ******************************************************************************/
+#define LED_RED     	 PD16
+#define LED_GREEN   	 PD15
+#define BTN1        	 PC12
+#define BTN2        	 PC13
+#define BUTTON_PRESSED   0U
+#define BUTTON_RELEASE   1U
 
-/* External driver instances */
+/*******************************************************************************
+ * Variables
+ ******************************************************************************/
 extern ARM_DRIVER_GPIO Driver_GPIO0;
+volatile uint8_t g_button1 = BUTTON_RELEASE;
+volatile uint8_t g_button2 = BUTTON_RELEASE;
 
-/* Prototype callback */
-void Button_Event(uint32_t event);
+/*******************************************************************************
+ * Prototypes
+ ******************************************************************************/
+void GPIO_ApplicationEventCallback(uint32_t pin, uint32_t event);
+void delay(void);
+
+/*******************************************************************************
+ * Code
+ ******************************************************************************/
 
 /**
- * @brief Callback function for button events
+ * @brief GPIO Application Event Callback: called automatically from PORT_IRQHandler()
  *
- * @param event The button event (1 for BTN1, 2 for BTN2)
+ * @param pin   Pin that triggered the event
+ * @param event Event type (RISING/FALLING/EITHER)
  */
-void Button_Event(uint32_t event) {
-    if (event == 1) {
-        /* Toggle LED RED */
-        uint32_t state = Driver_GPIO0.GetInput(LED_RED);
-        Driver_GPIO0.SetOutput(LED_RED, !state);
-    }
-    else if (event == 2) {
-        /* Toggle LED GREEN */
-        uint32_t state = Driver_GPIO0.GetInput(LED_GREEN);
-        Driver_GPIO0.SetOutput(LED_GREEN, !state);
+void GPIO_ApplicationEventCallback(uint32_t pin, uint32_t event)
+{
+    if (event == ARM_GPIO_EVENT_FALLING_EDGE)
+    {
+        if (pin == BTN1)
+        {
+            g_button1 = BUTTON_PRESSED;
+        }
+        else if (pin == BTN2)
+        {
+            g_button2 = BUTTON_PRESSED;
+        }
     }
 }
 
 /**
- * @brief Main function: Configures GPIOs and handles button events to toggle LEDs.
- *
- * @return int
+ * @brief Simple delay (software loop)
  */
-int main(void) {
+void delay(void)
+{
+    for (volatile uint32_t i = 0; i < 100000; i++);
+}
 
-    /* --- Config LED RED --- */
+/**
+ * @brief Main function
+ */
+int main(void)
+{
+    /* ==================== LED Configuration ==================== */
     Driver_GPIO0.Setup(LED_RED, NULL);
     Driver_GPIO0.SetDirection(LED_RED, ARM_GPIO_OUTPUT);
+    Driver_GPIO0.SetOutput(LED_RED, 1);
 
-    /* --- Config LED GREEN  --- */
     Driver_GPIO0.Setup(LED_GREEN, NULL);
     Driver_GPIO0.SetDirection(LED_GREEN, ARM_GPIO_OUTPUT);
+    Driver_GPIO0.SetOutput(LED_GREEN, 1);
 
-    /* --- Config Button BTN1 --- */
-    Driver_GPIO0.Setup(BTN1, NULL);
+    /* ==================== Button Configuration ==================== */
+    Driver_GPIO0.Setup(BTN1, GPIO_ApplicationEventCallback);
     Driver_GPIO0.SetDirection(BTN1, ARM_GPIO_INPUT);
     Driver_GPIO0.SetPullResistor(BTN1, ARM_GPIO_PULL_UP);
     Driver_GPIO0.SetEventTrigger(BTN1, ARM_GPIO_TRIGGER_FALLING_EDGE);
 
-    /* --- Config Button BTN2 --- */
-    Driver_GPIO0.Setup(BNT2, NULL);
-    Driver_GPIO0.SetDirection(BNT2, ARM_GPIO_INPUT);
-    Driver_GPIO0.SetPullResistor(BNT2, ARM_GPIO_PULL_UP);
-    Driver_GPIO0.SetEventTrigger(BNT2, ARM_GPIO_TRIGGER_FALLING_EDGE);
+    Driver_GPIO0.Setup(BTN2, GPIO_ApplicationEventCallback);
+    Driver_GPIO0.SetDirection(BTN2, ARM_GPIO_INPUT);
+    Driver_GPIO0.SetPullResistor(BTN2, ARM_GPIO_PULL_UP);
+    Driver_GPIO0.SetEventTrigger(BTN2, ARM_GPIO_TRIGGER_FALLING_EDGE);
 
-    /* Turn off LED RED and GREEN */
-    GPIO_SetPin(IP_PTD, 15);
-    GPIO_SetPin(IP_PTD, 16);
-
-    /* Config NVIC for PORTC */
+    /* ==================== NVIC Configuration ==================== */
     NVIC_ClearPendingIRQ(PORTC_IRQn);
-    NVIC_EnableIRQ(PORTC_IRQn);
     NVIC_SetPriority(PORTC_IRQn, 2);
+    NVIC_EnableIRQ(PORTC_IRQn);
 
-    while (1);
+    while (1)
+    {
+        if (g_button1 == BUTTON_PRESSED)
+        {
+            g_button1 = BUTTON_RELEASE;
+            uint32_t state = Driver_GPIO0.GetInput(LED_RED);
+            Driver_GPIO0.SetOutput(LED_RED, !state);
+        }
+
+        if (g_button2 == BUTTON_PRESSED)
+        {
+            g_button2 = BUTTON_RELEASE;
+            uint32_t state = Driver_GPIO0.GetInput(LED_GREEN);
+            Driver_GPIO0.SetOutput(LED_GREEN, !state);
+        }
+
+        delay();
+    }
 }
 
-/**
- * @brief Interrupt handler for PORTC to handle button presses.
- *
- */
-void PORTC_IRQHandler(void) {
-    uint32_t isfr = PORTC->ISFR;
-
-    if (isfr & (1 << 12)) {
-        Button_Event(1);
-        PORTC->ISFR = (1 << 12);
-    }
-    if (isfr & (1 << 13)) {
-        Button_Event(2);
-        PORTC->ISFR = (1 << 13);
-    }
-}

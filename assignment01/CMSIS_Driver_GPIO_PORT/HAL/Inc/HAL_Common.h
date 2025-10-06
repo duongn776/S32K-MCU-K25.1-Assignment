@@ -1,74 +1,47 @@
-/*
- * Driver_PORT.h
- *
- *  Created on: Sep 21, 2025
- *      Author: nhduo
+/**
+ ******************************************************************************
+ * @file    HAL_Common.h
+ * @author  Nguyen Hoang Duong
+ * @date    06-Oct-2025
+ * @brief   Common definitions and base pointers for HAL GPIO/PORT drivers.
+ ******************************************************************************
  */
 
-#ifndef INC_DRIVER_PORT_H_
-#define INC_DRIVER_PORT_H_
+#ifndef INC_HAL_COMMON_H_
+#define INC_HAL_COMMON_H_
 
 #include "S32K144.h"
-#include "HWAccess_PORT.h"
-/* Alias for PORTx */
-#define PORTA   IP_PORTA
-#define PORTB   IP_PORTB
-#define PORTC   IP_PORTC
-#define PORTD   IP_PORTD
-#define PORTE   IP_PORTE
+#include <stddef.h>
+#include <stdint.h>
 
-/* Alias for PCC */
-#define PCC		IP_PCC
+/* ===========================================================
+ *                      GENERAL DEFINITIONS
+ * =========================================================== */
 
-#define PORT_OUTPUT 1
-#define PORT_INPUT  0
-
-#define ENABLE 	1
-#define DISABLE 0
 /**
-  * @brief  PORT Init structure definition
-  */
-typedef struct
-{
-    PORT_Type *portBase;   /*!< PORTx base (PORTA..PORTE) */
+ * @brief  Total number of PORT instances available on S32K144
+ */
+#define GPIO_MAX_PORTS          (5U)
 
-    uint32_t   pin;        /*!< Specifies the pin muxing.
-    							      This parameter can be a value of @ref PORT_pin_define */
-
-    uint32_t   mux;        /*!< Specifies the pin muxing.
-                                This parameter can be a value of @ref PORT_mux_define */
-
-    uint32_t   pull;       /*!< Specifies Pull-Up or Pull-Down.
-                                This parameter can be a value of @ref PORT_pull_define */
-    uint32_t   interrupt;  /*!< Specifies the pin interrupt.
-                                This parameter can be a value of @ref PORT_interrupts_define */
-} PORT_Config_t;
-
-/** @defgroup PORT_mux_define  PORT mux define
-  * @{
-  */
-#define PORT_MUX_DISABLED             (0U)
-#define PORT_MUX_GPIO                 (1U)
-#define PORT_MUX_ALT2                 (2U)
-#define PORT_MUX_ALT3                 (3U)
-#define PORT_MUX_ALT4                 (4U)
-#define PORT_MUX_ALT5                 (5U)
-#define PORT_MUX_ALT6                 (6U)
-#define PORT_MUX_ALT7                 (7U)
 /**
-  * @}
-  */
+ * @brief  Total number of GPIO pins (5 ports × 32 pins)
+ */
+#define GPIO_MAX_PINS           (GPIO_MAX_PORTS * 32U)
 
-/** @defgroup PORT_pull_define PORT pull define
-  * @brief PORT Pull-Up or Pull-Down Activation
-  * @{
-  */
-#define PORT_NOPULL        (0)   /*!< No Pull-up or Pull-down activation  */
-#define PORT_PULLUP        (1)   /*!< Pull-up activation                  */
-#define PORT_PULLDOWN      (2)   /*!< Pull-down activation                */
 /**
-  * @}
-  */
+ * @brief  Check if pin index is within valid range
+ */
+#define PIN_IS_AVAILABLE(n)     ((n) < GPIO_MAX_PINS)
+
+/**
+ * @brief  Extract PORT index from pin number (0 = A, 1 = B, 2 = C, ...)
+ */
+#define GET_PORT(n)             ((n) / 32U)
+
+/**
+ * @brief  Extract pin number (0–31) within a given PORT
+ */
+#define GET_PIN(n)              ((n) % 32U)
 
 /** @defgroup PORT_pins_define  PORT pins define
   * @{
@@ -244,27 +217,15 @@ typedef struct
 #define PE30  (158)
 #define PE31  (159)
 
-
-
-/** @defgroup PORT_interrupts_define  PORT interrupts define
-  * @{
-  */
-#define PORT_INT_DISABLED      (0b0000U)
-#define PORT_INT_DMA_RISING    (0b0001U)
-#define PORT_INT_DMA_FALLING   (0b0010U)
-#define PORT_INT_DMA_EITHER    (0b0011U)
-#define PORT_INT_LOGIC_ZERO    (0b1000U)
-#define PORT_INT_RISING_EDGE   (0b1001U)
-#define PORT_INT_FALLING_EDGE  (0b1010U)
-#define PORT_INT_EITHER_EDGE   (0b1011U)
-#define PORT_INT_LOGIC_ONE     (0b1100U)
+/* ===========================================================
+ *                      BASE POINTER ARRAYS
+ * =========================================================== */
 
 /**
-  * @}
-  */
+ * @brief  External declarations for PORT and GPIO base address arrays.
+ *         Defined in HAL_GPIO.c to avoid multiple-definition.
+ */
+extern PORT_Type * const PORT_BASE[];
+extern GPIO_Type * const GPIO_BASE[];
 
-/* API functions */
-void PORT_Init(const PORT_Config_t *cfg);
-void PORT_PeriClockControl(PORT_Type *base, uint8_t clockState);
-
-#endif /* INC_DRIVER_PORT_H_ */
+#endif /* INC_HAL_COMMON_H_ */
