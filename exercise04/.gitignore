@@ -1,0 +1,8 @@
+# Ignore everything
+/*
+
+# Keep .gitignore itself
+!.gitignore
+
+# Keep Control_LED_3s_LPIT folder
+!/Control_LED_3s_LPIT/
