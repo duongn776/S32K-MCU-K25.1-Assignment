@@ -16,9 +16,6 @@ extern "C"
 #include "Driver_Common.h"
 #include "HAL_USART.h"
 
-
-extern USART_HandleTypeDef huart1;
-
 #define ARM_USART_API_VERSION ARM_DRIVER_VERSION_MAJOR_MINOR(2,4)  /* API version */
 
 

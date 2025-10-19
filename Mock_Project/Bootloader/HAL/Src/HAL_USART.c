@@ -10,25 +10,6 @@
 static void HAL_USART_EndTxTransfer(USART_HandleTypeDef *husart);
 static void HAL_USART_Transmit_TXE(USART_HandleTypeDef *husart);
 static void HAL_USART_Receive_RXNE(USART_HandleTypeDef *husart);
-
-USART_HandleTypeDef huart1 = {
-    .pUSARTx = LPUART1,
-    .Init = {
-        .Mode = USART_MODE_TX_RX,
-        .BaudRate = USART_BAUDRATE_115200,
-        .StopBits = USART_STOPBITS_1,
-        .ParityControl = USART_PARITY_NONE,
-        .HWFlowControl = USART_HW_NONE
-    },
-	.pTxBuffer = NULL,
-	.pRxBuffer = NULL,
-	.TxLen = 0,
-	.RxLen = 0,
-	.TxState = USART_STATE_READY,
-	.RxState = USART_STATE_READY,
-	.CallbackEvent = NULL
-};
-
 /**
  * @brief Enable or disable the peripheral clock for the specified USART.
  * 
@@ -86,9 +67,9 @@ static void HAL_USART_ConfigPin(LPUART_Type *pUSARTx)
 	else if (pUSARTx == LPUART1)
 	{
 
-		/* Config PTC6 as LPUART0_RX */
+		/* Config PTC8 as LPUART0_RX */
 		PORTC->PCR[8] = PORT_PCR_MUX(2);
-		/* Config PTC7 as LPUART0_TX */
+		/* Config PTC9 as LPUART0_TX */
 		PORTC->PCR[9] = PORT_PCR_MUX(2);
 	}
 	else if (pUSARTx == LPUART2)
@@ -177,7 +158,7 @@ void HAL_USART_Init(USART_HandleTypeDef *husart)
 	HAL_USART_PortClockControl(husart->pUSARTx, ENABLE);
 
 	/* Config Pin */
-	HAL_USART_ConfigPin(husart->pUSARTx);	
+	HAL_USART_ConfigPin(husart->pUSARTx);
 
 	/* Reset LPUART before initialization */
 	HAL_USART_Reset(husart->pUSARTx);
@@ -835,10 +816,3 @@ static void HAL_USART_Receive_RXNE(USART_HandleTypeDef *husart)
 		}
 	}
 }
-
-
-void LPUART1_RxTx_IRQHandler(void)
-{
-    HAL_USART_IRQHandler(&huart1);
-}
-
