@@ -6,52 +6,53 @@
  * Tool:    S32 Design Studio
  *
  * Description:
- *   Use the APIs provided by the UART Driver and GPIO Driver to
- *   build an application to control LEDs as required:
- *   • Send “LED STATUS” to get the information of the LEDs and display it on the PC’s
- *   console.
- *   • Send “RED ON” to turn on the Red LED and “RED OFF” to turn off the Red LED.
- *   • Send “GREEN ON” to turn on the Green LED and “GREEN OFF” to turn off the Green LED.
- *   • Send “BLUE ON” to turn on the Blue LED and “BLUE OFF” to turn off the Blue LED
- *   • Send “HELP” to display the guideline.
-• If the command is not in the correct format, print “Command not available”.
+ *   Bootloader application for S32K144 MCU.
+ *   The bootloader performs the following:
+ *   • If the button is pressed → enter Bootloader mode
+ *   • If not pressed → jump to User Application (UserApp) located at 0xA000
+ *
+ *   Bootloader UART commands (future use):
+ *   • Receive .SREC firmware file
+ *   • Parse SREC file and flash data into the UserApp region
  ******************************************************************************/
 
 #include "S32K144.h"
 #include "Driver_USART.h"
 #include "Driver_GPIO.h"
+#include "Srec_Parser.h"
+#include "Circular_Queue.h"
 
 /*******************************************************************************
  * Definitions
  ******************************************************************************/
-#define LED_RED     PD15
-#define LED_GREEN   PD16
-#define LED_BLUE    PD0
-#define MAX_CMD_LEN 50
+#define BTN1        	 PC13
+#define APP_START_ADDR   0x0000A000U
+
+/* UART messages */
+#define MSG_READY        "UART ready!!!\r\n"
+#define MSG_BOOT         "Entering Bootloader mode...\r\n"
+#define MSG_APP          "Jumping to UserApp...\r\n"
 
 /*******************************************************************************
- * Variables
+ * Global Variables
  ******************************************************************************/
 extern ARM_DRIVER_USART Driver_USART1;
 extern ARM_DRIVER_GPIO  Driver_GPIO0;
-uint8_t rx_char;
-char cmd_buffer[MAX_CMD_LEN];
-uint32_t cmd_index = 0;
+SrecQueue_t srecQueue;
 
+/* Function pointer type for UserApp entry point */
+typedef void (*AppEntry_t)(void);
 
 /*******************************************************************************
- * Prototypes
+ * Function Prototypes
  ******************************************************************************/
-void USART_Callback(uint32_t event);
-void Process_Command(char *cmd);
 void UART_SendString(const char *s);
-void LED_On(uint32_t pin);
-void LED_Off(uint32_t pin);
-uint8_t LED_Get(uint32_t pin);
 void SOSC_init_8MHz(void);
 void SPLL_init_160MHz(void);
 void UART_Init(void);
-void LED_Init(void);
+void Button_Init(void);
+void Bootloader_Mode(void);
+void JumpToUserApp(void);
 
 /**
  * @brief Send a string over UART
@@ -63,143 +64,9 @@ void UART_SendString(const char *s)
     Driver_USART1.Send(s, myStrlen(s));
 }
 
-/**
- * @brief Turn on LED (active low)
- *
- * @param pin pin number of the LED
- */
-void LED_On(uint32_t pin)
-{
-    Driver_GPIO0.SetOutput(pin, 0u);
-}
-
-/**
- * @brief Turn off LED (active low)
- *
- * @param pin pin number of the LED
- */
-void LED_Off(uint32_t pin)
-{
-    Driver_GPIO0.SetOutput(pin, 1u);
-}
-
-/**
- * @brief Get LED status (active low)
- *
- * @param pin pin number of the LED
- * @return uint8_t 1 if LED is ON, 0 if OFF
- */
-uint8_t LED_Get(uint32_t pin)
-{
-    return !Driver_GPIO0.GetInput(pin);
-}
-
-
-/**
- * @brief Process received command
- *
- * @param cmd command string
- * - HELP: show guidelines
- * - LED STATUS: show status of all LEDs
- * - RED ON / RED OFF: turn on/off red LED
- * - GREEN ON / GREEN OFF: turn on/off green LED
- * - BLUE ON / BLUE OFF: turn on/off blue LED
- * - Other: show "Command not available"
- */
-void Process_Command(char *cmd)
-{
-    /* Process command */
-   if (myStrcmp(cmd, "HELP") == 0)
-   {
-       UART_SendString("\r\nAvailable commands:\r\n");
-       UART_SendString("  LED STATUS\r\n");
-       UART_SendString("  RED ON / RED OFF\r\n");
-       UART_SendString("  GREEN ON / GREEN OFF\r\n");
-       UART_SendString("  BLUE ON / BLUE OFF\r\n");
-   }
-   else if (myStrcmp(cmd, "LED STATUS") == 0)
-   {
-       char msg[80];
-       sprintf(msg, "\r\nRED:%s GREEN:%s BLUE:%s\r\n",
-               LED_Get(LED_RED) ? "ON" : "OFF",
-               LED_Get(LED_GREEN) ? "ON" : "OFF",
-               LED_Get(LED_BLUE) ? "ON" : "OFF");
-       UART_SendString(msg);
-   }
-   else if (myStrcmp(cmd, "RED ON") == 0)
-   {
-       LED_On(LED_RED);
-       UART_SendString("\r\nRED LED ON\r\n");
-   }
-   else if (myStrcmp(cmd, "RED OFF") == 0)
-   {
-       LED_Off(LED_RED);
-       UART_SendString("\r\nRED LED OFF\r\n");
-   }
-   else if (myStrcmp(cmd, "GREEN ON") == 0)
-   {
-       LED_On(LED_GREEN);
-       UART_SendString("\r\nGREEN LED ON\r\n");
-   }
-   else if (myStrcmp(cmd, "GREEN OFF") == 0)
-   {
-       LED_Off(LED_GREEN);
-       UART_SendString("\r\nGREEN LED OFF\r\n");
-   }
-   else if (myStrcmp(cmd, "BLUE ON") == 0)
-   {
-       LED_On(LED_BLUE);
-       UART_SendString("\r\nBLUE LED ON\r\n");
-   }
-   else if (myStrcmp(cmd, "BLUE OFF") == 0)
-   {
-       LED_Off(LED_BLUE);
-       UART_SendString("\r\nBLUE LED OFF\r\n");
-   }
-   else
-   {
-       UART_SendString("\r\nCommand not available\r\n");
-   }
-}
-
-/**
- * @brief Callback function for USART events
- *
- * @param event uart event
- * - ARM_USART_EVENT_RECEIVE_COMPLETE: a byte is received
- */
-void USART_Callback(uint32_t event)
-{
-    /* Check for receive complete event */
-    if (event & ARM_USART_EVENT_RECEIVE_COMPLETE)
-    {
-        char c = (char)rx_char;
-
-        /* check for command end */
-        if (c == '\r' || c == '\n')
-        {
-            cmd_buffer[cmd_index] = '\0';
-            if (cmd_index > 0)
-            {
-                Process_Command(cmd_buffer);
-                cmd_index = 0;
-            }
-            UART_SendString("\r\n> ");
-        }
-        else
-        {
-            /* Add character to command buffer */
-            if (cmd_index < MAX_CMD_LEN - 1)
-            {
-                cmd_buffer[cmd_index++] = myToUpper(rx_char);
-            }
-        }
-
-        /* Continue to receive next byte */
-        Driver_USART1.Receive(&rx_char, 1);
-    }
-}
-
+/*******************************************************************************
+ * Clock Configuration
+ ******************************************************************************/
 /**
  * @brief Initialize System Oscillator (SOSC) at 8 MHz external crystal
  *
@@ -259,32 +126,28 @@ void SPLL_init_160MHz(void)
     while (!(SCG->SPLLCSR & SCG_SPLLCSR_SPLLVLD_MASK));
 }
 
+/*******************************************************************************
+ * Peripheral Initialization
+ ******************************************************************************/
 /**
- * @brief Initialize LEDs: Red, Green, Blue
- *
+ * @brief Initialize push button on PC13 (active low)
  */
-void LED_Init(void)
+void Button_Init(void)
 {
-    /* Initialize Red LED */
-    Driver_GPIO0.Setup(LED_RED, NULL);
-    Driver_GPIO0.SetDirection(LED_RED, ARM_GPIO_OUTPUT);
-    Driver_GPIO0.SetOutput(LED_RED, 1);
-
-    /* Initialize Green LED */
-    Driver_GPIO0.Setup(LED_GREEN, NULL);
-    Driver_GPIO0.SetDirection(LED_GREEN, ARM_GPIO_OUTPUT);
-    Driver_GPIO0.SetOutput(LED_GREEN, 1);
-
-    /* Initialize Blue LED */
-    Driver_GPIO0.Setup(LED_BLUE, NULL);
-    Driver_GPIO0.SetDirection(LED_BLUE, ARM_GPIO_OUTPUT);
-    Driver_GPIO0.SetOutput(LED_BLUE, 1);
+	Driver_GPIO0.Setup(BTN1, NULL);
+	Driver_GPIO0.SetDirection(BTN1, ARM_GPIO_INPUT);
+	Driver_GPIO0.SetPullResistor(BTN1, ARM_GPIO_PULL_UP);
+	Driver_GPIO0.SetEventTrigger(BTN1, ARM_GPIO_TRIGGER_NONE);
 }
 
+
+/**
+ * @brief Initialize UART1 at 115200 baud rate
+ */
 void UART_Init(void)
 {
     /* Initialize USART1 for UART communication */
-    Driver_USART1.Initialize(USART_Callback);
+    Driver_USART1.Initialize(NULL);
     Driver_USART1.PowerControl(ARM_POWER_FULL);
     Driver_USART1.Control(ARM_USART_MODE_ASYNCHRONOUS |
                           ARM_USART_DATA_BITS_8 |
@@ -295,30 +158,72 @@ void UART_Init(void)
     Driver_USART1.Control(ARM_USART_CONTROL_RX, 1u);
 }
 
+/*******************************************************************************
+ * Bootloader Logic
+ ******************************************************************************/
 /**
- * @brief Main function: program entry point turn on/off LEDs via UART commands
- *
- * @return int
+ * @brief Enter Bootloader mode (waiting for .SREC file)
  */
-int main(void)
+void Bootloader_Mode(void)
 {
-    /* Configure system clock */
-    SOSC_init_8MHz();
-    SPLL_init_160MHz();
-
-    /* Initialize LEDs */
-    LED_Init();
-
-    /* Initialize USART1 for UART communication */
-   UART_Init();
-
-   /* Send initial message */
-   UART_SendString("UART ready!!! Type command:\r\n> ");
-
-    /* Start receiving 1 byte */
-    Driver_USART1.Receive(&rx_char, 1);
+    UART_SendString("\r\n=== BOOTLOADER MODE ===\r\n");
+    UART_SendString("Send .SREC file via UART to update firmware.\r\n");
 
     while (1);
+}
+
+/**
+ * @brief Jump to User Application located at APP_START_ADDR
+ */
+void JumpToUserApp(void)
+{
+    UART_SendString("Jumping to User Application...\r\n");
+
+    uint32_t appStack       = *((uint32_t *)APP_START_ADDR);
+    uint32_t appResetVector = *((uint32_t *)(APP_START_ADDR + 4U));
+    AppEntry_t appEntry     = (AppEntry_t)appResetVector;
+
+    /* Set vector table offset to the start of UserApp */
+    SCB->VTOR = APP_START_ADDR;
+
+    /* Set Main Stack Pointer */
+    __set_MSP(appStack);
+
+    /* Jump to Application Reset Handler */
+    appEntry();
+
+    while (1);
+}
+
+
+/*******************************************************************************
+ * Main Function
+ ******************************************************************************/
+int main(void)
+{
+    /* Initialize system clock and peripherals */
+	SOSC_init_8MHz();
+    SPLL_init_160MHz();
+    UART_Init();
+    Button_Init();
+
+    UART_SendString(MSG_READY);
+
+    while (1)
+    {
+        if (Driver_GPIO0.GetInput(BTN1) == 0)
+        {
+            /* Button pressed → enter Bootloader mode */
+            UART_SendString(MSG_BOOT);
+            Bootloader_Mode();
+        }
+        else
+        {
+            /* Button not pressed → jump to User Application */
+            UART_SendString(MSG_APP);
+            JumpToUserApp();
+        }
+    }
 
     return 0;
 }

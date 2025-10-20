@@ -66,7 +66,6 @@ static void HAL_USART_ConfigPin(LPUART_Type *pUSARTx)
 	}
 	else if (pUSARTx == LPUART1)
 	{
-
 		/* Config PTC8 as LPUART0_RX */
 		PORTC->PCR[8] = PORT_PCR_MUX(2);
 		/* Config PTC9 as LPUART0_TX */

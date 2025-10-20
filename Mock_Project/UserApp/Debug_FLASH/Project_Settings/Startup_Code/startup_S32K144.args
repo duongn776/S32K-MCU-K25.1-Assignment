@@ -1,0 +1,7 @@
+-c
+-I"D:/Course_Online/MCU_S32K/assignment/Mock_Project/UserApp/include"
+-x assembler-with-cpp
+-DSTART_FROM_FLASH
+-g3
+-mcpu=cortex-m4
+-specs=rdimon.specs
