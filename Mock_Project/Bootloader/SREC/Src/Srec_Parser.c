@@ -151,15 +151,23 @@ bool Srec_parse_line(const char *line, SREC_Record *rec)
     {
         case SREC_TYPE_S1:
         case SREC_TYPE_S5:
-        case SREC_TYPE_S9: addr_len = 2U; break;
+        case SREC_TYPE_S9:
+        	addr_len = 2U;
+        	break;
 
         case SREC_TYPE_S2:
-        case SREC_TYPE_S8: addr_len = 3U; break;
+        case SREC_TYPE_S8:
+        	addr_len = 3U;
+        	break;
 
         case SREC_TYPE_S3:
-        case SREC_TYPE_S7: addr_len = 4U; break;
+        case SREC_TYPE_S7:
+        	addr_len = 4U;
+        	break;
 
-        default: addr_len = 2U; break;
+        default:
+        	addr_len = 2U;
+        	break;
     }
 
     /***************************************************************************
@@ -212,9 +220,11 @@ bool Srec_parse_line(const char *line, SREC_Record *rec)
     checksum = (uint8_t)tmp;
 
     /* Calculate checksum (sum of all bytes except checksum) */
+    sum += (uint8_t)hexbyte_to_value(&line[2]);
+
     for (uint8_t i = 0U; i < (byte_count - 1U); i++)
     {
-        tmp = hexbyte_to_value(&line[2 + (i * 2)]);
+    	tmp = hexbyte_to_value(&line[4 + (i * 2)]);
         if (tmp < 0)
         {
             return false;
@@ -228,7 +238,6 @@ bool Srec_parse_line(const char *line, SREC_Record *rec)
 
     return rec->checksum_ok;
 }
-
 /*******************************************************************************
  * End of File
  ******************************************************************************/

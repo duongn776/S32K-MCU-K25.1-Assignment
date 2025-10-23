@@ -39,6 +39,9 @@
 extern ARM_DRIVER_USART Driver_USART1;
 extern ARM_DRIVER_GPIO  Driver_GPIO0;
 SrecQueue_t srecQueue;
+char uart_rx_char;
+char current_line[QUEUE_MAX_LINE_LEN];
+uint32_t line_index = 0;
 
 /* Function pointer type for UserApp entry point */
 typedef void (*AppEntry_t)(void);
@@ -140,6 +143,29 @@ void Button_Init(void)
 	Driver_GPIO0.SetEventTrigger(BTN1, ARM_GPIO_TRIGGER_NONE);
 }
 
+static void UART1_Callback(uint32_t event)
+{
+    if (event & ARM_USART_EVENT_RECEIVE_COMPLETE)
+    {
+        if (uart_rx_char == '\r' || uart_rx_char == '\n')
+        {
+            if (line_index > 0)
+            {
+                current_line[line_index] = '\0';
+                Queue_Push(&srecQueue, current_line);
+                line_index = 0;
+            }
+        }
+        else
+        {
+            if (line_index < QUEUE_MAX_LINE_LEN - 1)
+                current_line[line_index++] = uart_rx_char;
+        }
+
+        Driver_USART1.Receive(&uart_rx_char, 1);
+    }
+}
+
 
 /**
  * @brief Initialize UART1 at 115200 baud rate
@@ -147,7 +173,7 @@ void Button_Init(void)
 void UART_Init(void)
 {
     /* Initialize USART1 for UART communication */
-    Driver_USART1.Initialize(NULL);
+    Driver_USART1.Initialize(UART1_Callback);
     Driver_USART1.PowerControl(ARM_POWER_FULL);
     Driver_USART1.Control(ARM_USART_MODE_ASYNCHRONOUS |
                           ARM_USART_DATA_BITS_8 |
@@ -156,7 +182,9 @@ void UART_Init(void)
                           ARM_USART_FLOW_CONTROL_NONE, 115200u);
     Driver_USART1.Control(ARM_USART_CONTROL_TX, 1u);
     Driver_USART1.Control(ARM_USART_CONTROL_RX, 1u);
+    Driver_USART1.Receive(&uart_rx_char, 1);
 }
+
 
 /*******************************************************************************
  * Bootloader Logic
@@ -169,7 +197,28 @@ void Bootloader_Mode(void)
     UART_SendString("\r\n=== BOOTLOADER MODE ===\r\n");
     UART_SendString("Send .SREC file via UART to update firmware.\r\n");
 
-    while (1);
+
+    Queue_Init(&srecQueue);
+     while (1)
+    {
+        if (!Queue_IsEmpty(&srecQueue))
+        {
+            char srecLine[QUEUE_MAX_LINE_LEN];
+            Queue_Pop(&srecQueue, srecLine);
+
+            SREC_Record record;
+            if (Srec_parse_line(srecLine, &record))
+            {
+                UART_SendString("OK: ");
+                UART_SendString(srecLine);
+                UART_SendString("\r\n");
+            }
+            else
+            {
+                UART_SendString("Parse ERROR\r\n");
+            }
+        }
+    }
 }
 
 /**
@@ -195,7 +244,6 @@ void JumpToUserApp(void)
     while (1);
 }
 
-
 /*******************************************************************************
  * Main Function
  ******************************************************************************/
@@ -208,9 +256,12 @@ int main(void)
     Button_Init();
 
     UART_SendString(MSG_READY);
+    UART_SendString("\r\n=== Bootloader UART Queue Parser TEST ===\r\n");
+    UART_SendString("Send .SREC file via UART to update firmware.\r\n");
 
     while (1)
     {
+    	for (uint32_t i = 0; i < 10000000;i++);
         if (Driver_GPIO0.GetInput(BTN1) == 0)
         {
             /* Button pressed → enter Bootloader mode */
@@ -223,6 +274,9 @@ int main(void)
             UART_SendString(MSG_APP);
             JumpToUserApp();
         }
+
+
+
     }
 
     return 0;
