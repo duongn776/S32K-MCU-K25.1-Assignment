@@ -21,27 +21,44 @@
 #include "Driver_GPIO.h"
 #include "Srec_Parser.h"
 #include "Circular_Queue.h"
-
+#include "Flash.h"
 /*******************************************************************************
  * Definitions
  ******************************************************************************/
-#define BTN1        	 PC13
+#define BTN1             PC13
 #define APP_START_ADDR   0x0000A000U
+#define UART_RX_BUF_SIZE 2048
 
 /* UART messages */
 #define MSG_READY        "UART ready!!!\r\n"
 #define MSG_BOOT         "Entering Bootloader mode...\r\n"
 #define MSG_APP          "Jumping to UserApp...\r\n"
-
+#define NUM_QUEUES 4
 /*******************************************************************************
  * Global Variables
  ******************************************************************************/
+typedef enum
+{
+    Q_IDLE = 0,
+    Q_WRITING,
+    Q_READY,
+    Q_READING
+} QueueState_t;
 extern ARM_DRIVER_USART Driver_USART1;
 extern ARM_DRIVER_GPIO  Driver_GPIO0;
-SrecQueue_t srecQueue;
 char uart_rx_char;
 char current_line[QUEUE_MAX_LINE_LEN];
 uint32_t line_index = 0;
+SrecQueue_t srecQueues[NUM_QUEUES];
+volatile uint8_t uart_rx_buffer[UART_RX_BUF_SIZE];
+volatile uint16_t uart_rx_head = 0;
+volatile uint16_t uart_rx_tail = 0;
+static volatile QueueState_t qstate[NUM_QUEUES];
+static volatile uint8_t activeQueueIndex = 0;
+static volatile uint8_t processQueueIndex = 0;
+
+
+
 
 /* Function pointer type for UserApp entry point */
 typedef void (*AppEntry_t)(void);
@@ -137,35 +154,25 @@ void SPLL_init_160MHz(void)
  */
 void Button_Init(void)
 {
-	Driver_GPIO0.Setup(BTN1, NULL);
-	Driver_GPIO0.SetDirection(BTN1, ARM_GPIO_INPUT);
-	Driver_GPIO0.SetPullResistor(BTN1, ARM_GPIO_PULL_UP);
-	Driver_GPIO0.SetEventTrigger(BTN1, ARM_GPIO_TRIGGER_NONE);
+    Driver_GPIO0.Setup(BTN1, NULL);
+    Driver_GPIO0.SetDirection(BTN1, ARM_GPIO_INPUT);
+    Driver_GPIO0.SetPullResistor(BTN1, ARM_GPIO_PULL_UP);
+    Driver_GPIO0.SetEventTrigger(BTN1, ARM_GPIO_TRIGGER_NONE);
 }
 
-static void UART1_Callback(uint32_t event)
+void UART1_Callback(uint32_t event)
 {
     if (event & ARM_USART_EVENT_RECEIVE_COMPLETE)
     {
-        if (uart_rx_char == '\r' || uart_rx_char == '\n')
+        uint16_t next = (uart_rx_head + 1) % UART_RX_BUF_SIZE;
+        if (next != uart_rx_tail)
         {
-            if (line_index > 0)
-            {
-                current_line[line_index] = '\0';
-                Queue_Push(&srecQueue, current_line);
-                line_index = 0;
-            }
+            uart_rx_buffer[uart_rx_head] = uart_rx_char;
+            uart_rx_head = next;
         }
-        else
-        {
-            if (line_index < QUEUE_MAX_LINE_LEN - 1)
-                current_line[line_index++] = uart_rx_char;
-        }
-
         Driver_USART1.Receive(&uart_rx_char, 1);
     }
 }
-
 
 /**
  * @brief Initialize UART1 at 115200 baud rate
@@ -179,47 +186,175 @@ void UART_Init(void)
                           ARM_USART_DATA_BITS_8 |
                           ARM_USART_PARITY_NONE |
                           ARM_USART_STOP_BITS_1 |
-                          ARM_USART_FLOW_CONTROL_NONE, 115200u);
+                          ARM_USART_FLOW_CONTROL_NONE, 9600u);
     Driver_USART1.Control(ARM_USART_CONTROL_TX, 1u);
     Driver_USART1.Control(ARM_USART_CONTROL_RX, 1u);
-    Driver_USART1.Receive(&uart_rx_char, 1);
 }
 
 
-/*******************************************************************************
- * Bootloader Logic
- ******************************************************************************/
-/**
- * @brief Enter Bootloader mode (waiting for .SREC file)
- */
-void Bootloader_Mode(void)
+
+void Process_UART_Buffer(void)
 {
-    UART_SendString("\r\n=== BOOTLOADER MODE ===\r\n");
-    UART_SendString("Send .SREC file via UART to update firmware.\r\n");
-
-
-    Queue_Init(&srecQueue);
-     while (1)
+    while (uart_rx_tail != uart_rx_head)
     {
-        if (!Queue_IsEmpty(&srecQueue))
-        {
-            char srecLine[QUEUE_MAX_LINE_LEN];
-            Queue_Pop(&srecQueue, srecLine);
+        char c = uart_rx_buffer[uart_rx_tail];
+        uart_rx_tail = (uart_rx_tail + 1) % UART_RX_BUF_SIZE;
 
-            SREC_Record record;
-            if (Srec_parse_line(srecLine, &record))
+        if (c == '\n' || c == '\r')
+        {
+            if (line_index > 0)
             {
-                UART_SendString("OK: ");
-                UART_SendString(srecLine);
-                UART_SendString("\r\n");
+                current_line[line_index] = '\0';
+
+                /* Push the line into the current queue */
+                if (Queue_Push(&srecQueues[activeQueueIndex], current_line))
+                {
+                    /* Mark queue ready for parser */
+                    qstate[activeQueueIndex] = Q_READY;
+
+                    /* Find a new queue to receive the next line */
+                    uint8_t next = (activeQueueIndex + 1) % NUM_QUEUES;
+                    for (int i = 0; i < NUM_QUEUES; i++)
+                    {
+                        if (qstate[next] == Q_IDLE)
+                        {
+                            qstate[next] = Q_WRITING;
+                            activeQueueIndex = next;
+                            break;
+                        }
+                        next = (next + 1) % NUM_QUEUES;
+                    }
+                }
+                line_index = 0;
             }
-            else
+        }
+        else
+        {
+            if (line_index < QUEUE_MAX_LINE_LEN - 1)
             {
-                UART_SendString("Parse ERROR\r\n");
+                current_line[line_index++] = c;
             }
+
         }
     }
 }
+
+uint8_t Bootloader_HandleSrecRecord(const SREC_Record *rec)
+{
+	static uint8_t app_erased = 0;
+
+    switch (rec->record_type)
+    {
+        case SREC_TYPE_S0:
+            /* Header file */
+        	return false;
+
+        case SREC_TYPE_S1:
+        case SREC_TYPE_S2:
+        case SREC_TYPE_S3:
+        {
+        	if (!app_erased)
+        	{
+        	    UART_SendString("Erasing APP area...\r\n");
+        	    Erase_Multi_Sector(APP_START_ADDR, APP_SECTOR_COUNT);
+        	    app_erased = 1;
+        	    UART_SendString("Erase done.\r\n");
+        	}
+            uint32_t addr  = rec->address;
+            uint8_t *pdata = (uint8_t*)rec->data;
+            uint32_t len   = rec->data_length;
+
+            while (len > 0)
+            {
+                uint8_t buf[8];
+                memset(buf, 0xFF, 8);
+
+                uint8_t chunk = (len >= 8) ? 8 : len;
+                memcpy(buf, pdata, chunk);
+
+                if (!Program_LongWord_8B(addr, buf))
+                {
+                    UART_SendString("FLASH WRITE ERROR\r\n");
+                    break;
+                }
+
+                addr  += 8;
+                pdata += 8;
+                len   -= chunk;
+            }
+
+            return false;
+        }
+
+        case SREC_TYPE_S7:
+        case SREC_TYPE_S8:
+        case SREC_TYPE_S9:
+        	/* Only signals that the SREC file has ended */
+            UART_SendString("SREC END DETECTED\r\n");
+            return true;
+
+        default:
+            UART_SendString("Unknown SREC record\r\n");
+            return false;
+    }
+}
+
+
+void Bootloader_Mode(void)
+{
+    UART_SendString("\r\n=== BOOTLOADER MODE ===\r\n");
+
+    for (int i = 0; i < NUM_QUEUES; i++)
+    {
+        Queue_Init(&srecQueues[i]);
+        qstate[i] = Q_IDLE;
+    }
+
+    activeQueueIndex = 0;
+    qstate[0] = Q_WRITING;
+    processQueueIndex = 0;
+    Driver_USART1.Receive(&uart_rx_char, 1);
+    while (1)
+    {
+        /* receive new data from buffer */
+        Process_UART_Buffer();
+
+        /* Parser processes queue ready */
+        if (qstate[processQueueIndex] == Q_READY)
+        {
+            qstate[processQueueIndex] = Q_READING;
+
+            SrecQueue_t *q = &srecQueues[processQueueIndex];
+            char line[QUEUE_MAX_LINE_LEN];
+
+            while (!Queue_IsEmpty(q))
+            {
+                Queue_Pop(q, line);
+                SREC_Record rec;
+                if (Srec_parse_line(line, &rec))
+                {
+                    uint8_t end_flag = Bootloader_HandleSrecRecord(&rec);
+
+                    if (end_flag)
+                    {
+                        UART_SendString("Bootloader: Parsing completed. STOP.\r\n");
+                        break;
+                    }
+                }
+                else
+                {
+                    UART_SendString("Parse ERROR\r\n");
+                }
+
+            }
+            qstate[processQueueIndex] = Q_IDLE;
+        }
+
+        processQueueIndex = (processQueueIndex + 1) % NUM_QUEUES;
+    }
+}
+
+
 
 /**
  * @brief Jump to User Application located at APP_START_ADDR
@@ -250,18 +385,16 @@ void JumpToUserApp(void)
 int main(void)
 {
     /* Initialize system clock and peripherals */
-	SOSC_init_8MHz();
+    SOSC_init_8MHz();
     SPLL_init_160MHz();
     UART_Init();
     Button_Init();
 
     UART_SendString(MSG_READY);
-    UART_SendString("\r\n=== Bootloader UART Queue Parser TEST ===\r\n");
-    UART_SendString("Send .SREC file via UART to update firmware.\r\n");
+
 
     while (1)
     {
-    	for (uint32_t i = 0; i < 10000000;i++);
         if (Driver_GPIO0.GetInput(BTN1) == 0)
         {
             /* Button pressed → enter Bootloader mode */
@@ -271,8 +404,8 @@ int main(void)
         else
         {
             /* Button not pressed → jump to User Application */
-            UART_SendString(MSG_APP);
-            JumpToUserApp();
+            //UART_SendString(MSG_APP);
+            //JumpToUserApp();
         }
 
 
@@ -280,4 +413,9 @@ int main(void)
     }
 
     return 0;
+}
+
+void HardFault_Handler(void)
+{
+	UART_SendString("Jumping to HardFault...\r\n");
 }

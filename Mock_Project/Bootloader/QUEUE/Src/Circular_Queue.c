@@ -10,9 +10,6 @@
 
 #include "Circular_Queue.h"
 
-/*=============================================================================
- * Local (Static) Functions
- *===========================================================================*/
 /**
  * @brief   Safe string copy with guaranteed null-termination.
  * @param   dest Destination buffer.
@@ -29,9 +26,6 @@ static void my_strncpy(char *dest, const char *src, uint32_t n)
     dest[i] = '\0';
 }
 
-/*=============================================================================
- * Public API Implementations
- *===========================================================================*/
 
 /**
  * @brief Initialize the circular queue to an empty state.
@@ -49,7 +43,7 @@ void Queue_Init(SrecQueue_t *q)
  * @param q Pointer to queue instance.
  * @return true  if empty, false otherwise.
  */
-bool Queue_IsEmpty(const SrecQueue_t *q)
+boolean Queue_IsEmpty(const SrecQueue_t *q)
 {
     return (q->count == 0U);
 }
@@ -59,7 +53,7 @@ bool Queue_IsEmpty(const SrecQueue_t *q)
  * @param q Pointer to queue instance.
  * @return true  if full, false otherwise.
  */
-bool Queue_IsFull(const SrecQueue_t *q)
+boolean Queue_IsFull(const SrecQueue_t *q)
 {
     return (q->count >= QUEUE_MAX_SIZE);
 }
@@ -71,7 +65,7 @@ bool Queue_IsFull(const SrecQueue_t *q)
  * @return true  if successfully enqueued.
  * @return false if queue is full or input is NULL.
  */
-bool Queue_Push(SrecQueue_t *q, const char *line)
+boolean Queue_Push(SrecQueue_t *q, const char *line)
 {
     if (Queue_IsFull(q) || (line == NULL))
     {
@@ -94,7 +88,7 @@ bool Queue_Push(SrecQueue_t *q, const char *line)
  * @return true  if a line was successfully dequeued.
  * @return false if the queue is empty or output buffer is NULL.
  */
-bool Queue_Pop(SrecQueue_t *q, char *out_line)
+boolean Queue_Pop(SrecQueue_t *q, char *out_line)
 {
     if (Queue_IsEmpty(q) || (out_line == NULL))
     {

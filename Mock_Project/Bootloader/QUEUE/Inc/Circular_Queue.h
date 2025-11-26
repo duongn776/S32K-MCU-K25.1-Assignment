@@ -15,33 +15,22 @@
 /*=============================================================================
  * Includes
  *===========================================================================*/
-#include <stdint.h>
-#include <stdbool.h>
-#include <string.h>
+#include "S32K144.h"
+
 
 /*=============================================================================
  * Definitions
  *===========================================================================*/
-/**
- * @brief Maximum number of lines the queue can store.
- */
 #define QUEUE_MAX_SIZE        4U
-
-/**
- * @brief Maximum length (in bytes) of a single stored line, including the
- *        terminating null character. Input longer than this is truncated.
- */
 #define QUEUE_MAX_LINE_LEN    120U
-
+#define NULL ((void *)0)
+#define true 1
+#define false 0
 /*=============================================================================
  * Type Definitions
  *===========================================================================*/
-/**
- * @brief Circular queue container for SREC text lines.
- *
- * The buffer holds up to @ref QUEUE_MAX_SIZE lines, each up to
- * @ref QUEUE_MAX_LINE_LEN bytes (including the trailing '\0').
- */
+typedef uint8_t boolean;
+
 typedef struct
 {
     char     buffer[QUEUE_MAX_SIZE][QUEUE_MAX_LINE_LEN]; /*!< Storage for lines */
@@ -54,10 +43,10 @@ typedef struct
  * API Prototypes
  *===========================================================================*/
 void Queue_Init(SrecQueue_t *q);
-bool Queue_Push(SrecQueue_t *q, const char *line);
-bool Queue_Pop(SrecQueue_t *q, char *out_line);
-bool Queue_IsEmpty(const SrecQueue_t *q);
-bool Queue_IsFull(const SrecQueue_t *q);
+boolean Queue_Push(SrecQueue_t *q, const char *line);
+boolean Queue_Pop(SrecQueue_t *q, char *out_line);
+boolean Queue_IsEmpty(const SrecQueue_t *q);
+boolean Queue_IsFull(const SrecQueue_t *q);
 
 #endif /* INC_CIRCULAR_QUEUE_H_ */
 

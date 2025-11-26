@@ -99,7 +99,7 @@ static int32_t hexbyte_to_value(const char *hexbyte)
  *  3. Computes checksum and compares it with provided one
  *  4. Fills SREC_Record structure with parsed information
  */
-bool Srec_parse_line(const char *line, SREC_Record *rec)
+boolean Srec_parse_line(const char *line, SREC_Record *rec)
 {
     int32_t tmp = 0;
     uint8_t offset = 4U;
@@ -123,15 +123,32 @@ bool Srec_parse_line(const char *line, SREC_Record *rec)
 
     switch (line[1])
     {
-        case '0': rec->record_type = SREC_TYPE_S0; break;
-        case '1': rec->record_type = SREC_TYPE_S1; break;
-        case '2': rec->record_type = SREC_TYPE_S2; break;
-        case '3': rec->record_type = SREC_TYPE_S3; break;
-        case '5': rec->record_type = SREC_TYPE_S5; break;
-        case '7': rec->record_type = SREC_TYPE_S7; break;
-        case '8': rec->record_type = SREC_TYPE_S8; break;
-        case '9': rec->record_type = SREC_TYPE_S9; break;
-        default:  return false;
+        case '0':
+        	rec->record_type = SREC_TYPE_S0;
+        	break;
+        case '1':
+        	rec->record_type = SREC_TYPE_S1;
+        	break;
+        case '2':
+        	rec->record_type = SREC_TYPE_S2;
+        	break;
+        case '3':
+        	rec->record_type = SREC_TYPE_S3;
+        	break;
+        case '5':
+        	rec->record_type = SREC_TYPE_S5;
+        	break;
+        case '7':
+        	rec->record_type = SREC_TYPE_S7;
+        	break;
+        case '8':
+        	rec->record_type = SREC_TYPE_S8;
+        	break;
+        case '9':
+        	rec->record_type = SREC_TYPE_S9;
+        	break;
+        default:
+        	return false;
     }
 
     /***************************************************************************

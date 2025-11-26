@@ -12,7 +12,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
-
+#include<string.h>
 #define ARM_DRIVER_VERSION_MAJOR_MINOR(major,minor) (((major) << 8) | (minor))
 
 /**

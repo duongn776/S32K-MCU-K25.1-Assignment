@@ -14,15 +14,16 @@
 /*******************************************************************************
  * Includes
  ******************************************************************************/
-#include <stdint.h>
-#include <stdbool.h>
-#include <string.h>
+#include "S32K144.h"
 
 /*******************************************************************************
  * Definitions
  ******************************************************************************/
 #define SREC_MAX_DATA_LEN    255U  /*!< Maximum data length for a single SREC record */
-
+typedef uint8_t boolean;
+#define NULL ((void *)0)
+#define true 1
+#define false 0
 /*******************************************************************************
  * Type Definitions
  ******************************************************************************/
@@ -54,7 +55,7 @@ typedef struct
     uint32_t address;                           /*!< Address extracted from record */
     uint8_t  data[SREC_MAX_DATA_LEN];           /*!< Data bytes from record */
     uint8_t  data_length;                       /*!< Number of valid data bytes */
-    bool     checksum_ok;                       /*!< Checksum verification result */
+    boolean     checksum_ok;                       /*!< Checksum verification result */
 } SREC_Record;
 
 /*******************************************************************************
@@ -67,7 +68,7 @@ typedef struct
  * @param   rec  Pointer to a SREC_Record structure to store parsed results.
  * @return  true if the record is valid and checksum passes, false otherwise.
  */
-bool Srec_parse_line(const char *line, SREC_Record *rec);
+boolean Srec_parse_line(const char *line, SREC_Record *rec);
 
 #endif /* INC_SREC_PARSER_H_ */
 
