@@ -195,13 +195,15 @@ void UART_Init(void)
 
 void Process_UART_Buffer(void)
 {
+	uint8_t next = 0;
+	char c;
     while (uart_rx_tail != uart_rx_head)
     {
-        char c = uart_rx_buffer[uart_rx_tail];
-        uart_rx_tail = (uart_rx_tail + 1) % UART_RX_BUF_SIZE;
+        c = uart_rx_buffer[uart_rx_tail];
 
-        if (c == '\n' || c == '\r')
+        if (c == '\r')
         {
+        	uart_rx_tail = (uart_rx_tail + 2) % UART_RX_BUF_SIZE;
             if (line_index > 0)
             {
                 current_line[line_index] = '\0';
@@ -213,14 +215,14 @@ void Process_UART_Buffer(void)
                     qstate[activeQueueIndex] = Q_READY;
 
                     /* Find a new queue to receive the next line */
-                    uint8_t next = (activeQueueIndex + 1) % NUM_QUEUES;
+                    next = (activeQueueIndex + 1) % NUM_QUEUES;
                     for (int i = 0; i < NUM_QUEUES; i++)
                     {
                         if (qstate[next] == Q_IDLE)
                         {
                             qstate[next] = Q_WRITING;
                             activeQueueIndex = next;
-                            break;
+                            i = NUM_QUEUES;
                         }
                         next = (next + 1) % NUM_QUEUES;
                     }
@@ -234,7 +236,7 @@ void Process_UART_Buffer(void)
             {
                 current_line[line_index++] = c;
             }
-
+            uart_rx_tail = (uart_rx_tail + 1) % UART_RX_BUF_SIZE;
         }
     }
 }
@@ -256,7 +258,7 @@ uint8_t Bootloader_HandleSrecRecord(const SREC_Record *rec)
         	if (!app_erased)
         	{
         	    UART_SendString("Erasing APP area...\r\n");
-        	    Erase_Multi_Sector(APP_START_ADDR, APP_SECTOR_COUNT);
+        	    //Erase_Multi_Sector(APP_START_ADDR, APP_SECTOR_COUNT);
         	    app_erased = 1;
         	    UART_SendString("Erase done.\r\n");
         	}
@@ -275,7 +277,7 @@ uint8_t Bootloader_HandleSrecRecord(const SREC_Record *rec)
                 if (!Program_LongWord_8B(addr, buf))
                 {
                     UART_SendString("FLASH WRITE ERROR\r\n");
-                    break;
+                    //break;
                 }
 
                 addr  += 8;
@@ -303,7 +305,7 @@ uint8_t Bootloader_HandleSrecRecord(const SREC_Record *rec)
 void Bootloader_Mode(void)
 {
     UART_SendString("\r\n=== BOOTLOADER MODE ===\r\n");
-
+    UART_SendString("\r\n=== Send file SREC ===\r\n");
     for (int i = 0; i < NUM_QUEUES; i++)
     {
         Queue_Init(&srecQueues[i]);
@@ -327,7 +329,7 @@ void Bootloader_Mode(void)
             SrecQueue_t *q = &srecQueues[processQueueIndex];
             char line[QUEUE_MAX_LINE_LEN];
 
-            while (!Queue_IsEmpty(q))
+            while (0)
             {
                 Queue_Pop(q, line);
                 SREC_Record rec;
@@ -338,7 +340,7 @@ void Bootloader_Mode(void)
                     if (end_flag)
                     {
                         UART_SendString("Bootloader: Parsing completed. STOP.\r\n");
-                        break;
+                        //break;
                     }
                 }
                 else
@@ -398,14 +400,14 @@ int main(void)
         if (Driver_GPIO0.GetInput(BTN1) == 0)
         {
             /* Button pressed → enter Bootloader mode */
-            UART_SendString(MSG_BOOT);
+            //UART_SendString(MSG_BOOT);
             Bootloader_Mode();
         }
         else
         {
             /* Button not pressed → jump to User Application */
             //UART_SendString(MSG_APP);
-            //JumpToUserApp();
+        	JumpToUserApp();
         }
 
 

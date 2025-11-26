@@ -80,11 +80,11 @@ uint8_t  Erase_Sector(uint32_t Addr)
     IP_FTFC->FCCOB[0] = (uint8_t)(Addr >> 0);
 
     /* wait until operation finishes or write/erase timeout is reached */
-    while (0U == ((IP_FTFC->FSTAT) & 0x80));
+    while (IP_FTFC->FSTAT == 0x00);
     /* Clear CCIF */
     IP_FTFC->FSTAT = 0x80;
-    /* wait until operation finishes or write/erase timeout is reached */
-//    while (0U == ((IP_FTFC->FSTAT) & 0x80));
+    asm("nop");
+    asm("nop");
     return 1;
 }
 
