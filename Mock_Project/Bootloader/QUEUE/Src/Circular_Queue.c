@@ -16,16 +16,6 @@
  * @param   src  Source string.
  * @param   n    Maximum number of bytes to copy (including '\0').
  */
-static void my_strncpy(char *dest, const char *src, uint32_t n)
-{
-    uint32_t i;
-    for (i = 0; i < n - 1 && src[i] != '\0'; i++)
-    {
-        dest[i] = src[i];
-    }
-    dest[i] = '\0';
-}
-
 
 /**
  * @brief Initialize the circular queue to an empty state.
@@ -34,7 +24,7 @@ static void my_strncpy(char *dest, const char *src, uint32_t n)
 void Queue_Init(SrecQueue_t *q)
 {
     q->front = 0U;
-    q->rear  = 0U;
+    q->rear  = -1;
     q->count = 0U;
 }
 
@@ -55,7 +45,7 @@ boolean Queue_IsEmpty(const SrecQueue_t *q)
  */
 boolean Queue_IsFull(const SrecQueue_t *q)
 {
-    return (q->count >= QUEUE_MAX_SIZE);
+    return (q->count == QUEUE_MAX_SIZE);
 }
 
 /**
@@ -67,16 +57,13 @@ boolean Queue_IsFull(const SrecQueue_t *q)
  */
 boolean Queue_Push(SrecQueue_t *q, const char *line)
 {
-    if (Queue_IsFull(q) || (line == NULL))
-    {
+    if (q == NULL || line == NULL || Queue_IsFull(q)) {
         return false;
     }
-
-    my_strncpy(q->buffer[q->rear], line, QUEUE_MAX_LINE_LEN);
-
-    q->rear = (uint8_t)((q->rear + 1U) % QUEUE_MAX_SIZE);
+    q->rear = (q->rear + 1) % QUEUE_MAX_SIZE;
+    strncpy(q->buffer[q->rear], line, QUEUE_MAX_LINE_LEN - 1);
+    q->buffer[q->rear][QUEUE_MAX_LINE_LEN - 1] = '\0';  // ensure null termination
     q->count++;
-
     return true;
 }
 
@@ -90,16 +77,15 @@ boolean Queue_Push(SrecQueue_t *q, const char *line)
  */
 boolean Queue_Pop(SrecQueue_t *q, char *out_line)
 {
-    if (Queue_IsEmpty(q) || (out_line == NULL))
-    {
+    if (q == NULL || out_line == NULL || Queue_IsEmpty(q)) {
         return false;
     }
 
-    my_strncpy(out_line, q->buffer[q->front], QUEUE_MAX_LINE_LEN);
+    strncpy(out_line, q->buffer[q->front], QUEUE_MAX_LINE_LEN - 1);
+    out_line[QUEUE_MAX_LINE_LEN - 1] = '\0';  // ensure null termination
 
-    q->front = (uint8_t)((q->front + 1U) % QUEUE_MAX_SIZE);
+    q->front = (q->front + 1) % QUEUE_MAX_SIZE;
     q->count--;
-
     return true;
 }
 

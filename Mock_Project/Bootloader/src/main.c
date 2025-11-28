@@ -27,36 +27,24 @@
  ******************************************************************************/
 #define BTN1             PC13
 #define APP_START_ADDR   0x0000A000U
-#define UART_RX_BUF_SIZE 2048
+#define UART_RX_BUF_SIZE 512
 
 /* UART messages */
 #define MSG_READY        "UART ready!!!\r\n"
 #define MSG_BOOT         "Entering Bootloader mode...\r\n"
 #define MSG_APP          "Jumping to UserApp...\r\n"
-#define NUM_QUEUES 4
+#define NUM_QUEUES 		 4
 /*******************************************************************************
  * Global Variables
  ******************************************************************************/
-typedef enum
-{
-    Q_IDLE = 0,
-    Q_WRITING,
-    Q_READY,
-    Q_READING
-} QueueState_t;
 extern ARM_DRIVER_USART Driver_USART1;
 extern ARM_DRIVER_GPIO  Driver_GPIO0;
 char uart_rx_char;
 char current_line[QUEUE_MAX_LINE_LEN];
 uint32_t line_index = 0;
 SrecQueue_t srecQueues[NUM_QUEUES];
-volatile uint8_t uart_rx_buffer[UART_RX_BUF_SIZE];
-volatile uint16_t uart_rx_head = 0;
-volatile uint16_t uart_rx_tail = 0;
-static volatile QueueState_t qstate[NUM_QUEUES];
-static volatile uint8_t activeQueueIndex = 0;
-static volatile uint8_t processQueueIndex = 0;
-
+static volatile int curr_index = 0;
+static volatile int process_index = 0;
 
 
 
@@ -159,20 +147,33 @@ void Button_Init(void)
     Driver_GPIO0.SetPullResistor(BTN1, ARM_GPIO_PULL_UP);
     Driver_GPIO0.SetEventTrigger(BTN1, ARM_GPIO_TRIGGER_NONE);
 }
-
 void UART1_Callback(uint32_t event)
 {
     if (event & ARM_USART_EVENT_RECEIVE_COMPLETE)
     {
-        uint16_t next = (uart_rx_head + 1) % UART_RX_BUF_SIZE;
-        if (next != uart_rx_tail)
+        if (uart_rx_char == '\r' || uart_rx_char == '\n')
         {
-            uart_rx_buffer[uart_rx_head] = uart_rx_char;
-            uart_rx_head = next;
+            if (line_index > 0)
+            {
+                current_line[line_index] = '\0';
+                Queue_Push(&srecQueues[curr_index], current_line);
+                curr_index = (curr_index + 1) % NUM_QUEUES;
+                line_index = 0;
+            }
         }
+        else
+        {
+            if (line_index < QUEUE_MAX_LINE_LEN - 1)
+            {
+                current_line[line_index++] = uart_rx_char;
+            }
+        }
+
         Driver_USART1.Receive(&uart_rx_char, 1);
     }
 }
+
+
 
 /**
  * @brief Initialize UART1 at 115200 baud rate
@@ -190,57 +191,6 @@ void UART_Init(void)
     Driver_USART1.Control(ARM_USART_CONTROL_TX, 1u);
     Driver_USART1.Control(ARM_USART_CONTROL_RX, 1u);
 }
-
-
-
-void Process_UART_Buffer(void)
-{
-	uint8_t next = 0;
-	char c;
-    while (uart_rx_tail != uart_rx_head)
-    {
-        c = uart_rx_buffer[uart_rx_tail];
-
-        if (c == '\r')
-        {
-        	uart_rx_tail = (uart_rx_tail + 2) % UART_RX_BUF_SIZE;
-            if (line_index > 0)
-            {
-                current_line[line_index] = '\0';
-
-                /* Push the line into the current queue */
-                if (Queue_Push(&srecQueues[activeQueueIndex], current_line))
-                {
-                    /* Mark queue ready for parser */
-                    qstate[activeQueueIndex] = Q_READY;
-
-                    /* Find a new queue to receive the next line */
-                    next = (activeQueueIndex + 1) % NUM_QUEUES;
-                    for (int i = 0; i < NUM_QUEUES; i++)
-                    {
-                        if (qstate[next] == Q_IDLE)
-                        {
-                            qstate[next] = Q_WRITING;
-                            activeQueueIndex = next;
-                            i = NUM_QUEUES;
-                        }
-                        next = (next + 1) % NUM_QUEUES;
-                    }
-                }
-                line_index = 0;
-            }
-        }
-        else
-        {
-            if (line_index < QUEUE_MAX_LINE_LEN - 1)
-            {
-                current_line[line_index++] = c;
-            }
-            uart_rx_tail = (uart_rx_tail + 1) % UART_RX_BUF_SIZE;
-        }
-    }
-}
-
 uint8_t Bootloader_HandleSrecRecord(const SREC_Record *rec)
 {
 	static uint8_t app_erased = 0;
@@ -300,60 +250,32 @@ uint8_t Bootloader_HandleSrecRecord(const SREC_Record *rec)
             return false;
     }
 }
-
-
 void Bootloader_Mode(void)
 {
     UART_SendString("\r\n=== BOOTLOADER MODE ===\r\n");
-    UART_SendString("\r\n=== Send file SREC ===\r\n");
+    UART_SendString("Send .SREC file via UART to update firmware.\r\n");
     for (int i = 0; i < NUM_QUEUES; i++)
     {
-        Queue_Init(&srecQueues[i]);
-        qstate[i] = Q_IDLE;
+    	Queue_Init(&srecQueues[i]);
     }
-
-    activeQueueIndex = 0;
-    qstate[0] = Q_WRITING;
-    processQueueIndex = 0;
     Driver_USART1.Receive(&uart_rx_char, 1);
+
     while (1)
     {
-        /* receive new data from buffer */
-        Process_UART_Buffer();
-
-        /* Parser processes queue ready */
-        if (qstate[processQueueIndex] == Q_READY)
-        {
-            qstate[processQueueIndex] = Q_READING;
-
-            SrecQueue_t *q = &srecQueues[processQueueIndex];
-            char line[QUEUE_MAX_LINE_LEN];
-
-            while (0)
-            {
-                Queue_Pop(q, line);
-                SREC_Record rec;
-                if (Srec_parse_line(line, &rec))
+                char srecLine[QUEUE_MAX_LINE_LEN];
+                if (Queue_Pop(&srecQueues[process_index], srecLine))
                 {
-                    uint8_t end_flag = Bootloader_HandleSrecRecord(&rec);
-
-                    if (end_flag)
+                    SREC_Record record;
+                    if (Srec_parse_line(srecLine, &record))
                     {
-                        UART_SendString("Bootloader: Parsing completed. STOP.\r\n");
-                        //break;
+                    	UART_SendString("REC: ");
+                    	UART_SendString(srecLine);
+                    	UART_SendString("\r\n");
                     }
                 }
-                else
-                {
-                    UART_SendString("Parse ERROR\r\n");
-                }
+                process_index = (process_index + 1) % NUM_QUEUES;
 
-            }
-            qstate[processQueueIndex] = Q_IDLE;
-        }
-
-        processQueueIndex = (processQueueIndex + 1) % NUM_QUEUES;
-    }
+   }
 }
 
 
@@ -400,14 +322,14 @@ int main(void)
         if (Driver_GPIO0.GetInput(BTN1) == 0)
         {
             /* Button pressed → enter Bootloader mode */
-            //UART_SendString(MSG_BOOT);
+            UART_SendString(MSG_BOOT);
             Bootloader_Mode();
         }
         else
         {
             /* Button not pressed → jump to User Application */
-            //UART_SendString(MSG_APP);
-        	JumpToUserApp();
+            UART_SendString(MSG_APP);
+            JumpToUserApp();
         }
 
 
@@ -415,9 +337,4 @@ int main(void)
     }
 
     return 0;
-}
-
-void HardFault_Handler(void)
-{
-	UART_SendString("Jumping to HardFault...\r\n");
 }

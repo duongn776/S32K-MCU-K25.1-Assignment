@@ -16,13 +16,13 @@
  * Includes
  *===========================================================================*/
 #include "S32K144.h"
-
+#include<string.h>
 
 /*=============================================================================
  * Definitions
  *===========================================================================*/
-#define QUEUE_MAX_SIZE        4U
-#define QUEUE_MAX_LINE_LEN    120U
+#define QUEUE_MAX_SIZE        16
+#define QUEUE_MAX_LINE_LEN    70
 #define NULL ((void *)0)
 #define true 1
 #define false 0
@@ -33,10 +33,10 @@ typedef uint8_t boolean;
 
 typedef struct
 {
-    char     buffer[QUEUE_MAX_SIZE][QUEUE_MAX_LINE_LEN]; /*!< Storage for lines */
-    uint8_t  front;     /*!< Index of the next element to pop */
-    uint8_t  rear;      /*!< Index of the next slot to push  */
-    uint8_t  count;     /*!< Current number of stored lines  */
+    char buffer[QUEUE_MAX_SIZE][QUEUE_MAX_LINE_LEN]; /*!< Storage for lines */
+    int  front;     /*!< Index of the next element to pop */
+    int  rear;      /*!< Index of the next slot to push  */
+    int  count;     /*!< Current number of stored lines  */
 } SrecQueue_t;
 
 /*=============================================================================
