@@ -85,13 +85,10 @@ static void LED_Red_Toggle(void)
 static void Button_LED_Control(void)
 {
     /* Check if button is pressed (active low) */
-    if ((PTC->PDIR & (1 << BTN_PIN)) == 0U)
-    {
         LED_Red_Toggle();
 
         /* Simple debounce delay */
         for (volatile uint32_t i = 0; i < 300000; i++);
-    }
 }
 
 /*******************************************************************************

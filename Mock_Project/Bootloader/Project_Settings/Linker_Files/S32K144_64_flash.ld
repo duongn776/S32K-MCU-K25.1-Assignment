@@ -86,6 +86,15 @@ SECTIONS
   {
     . = ALIGN(4);
     *(.text)                 /* .text sections (code) */
+    acmem_43_infls_code_rom_start = .;
+    acfls_code_rom_start = .;
+    . = ALIGN(4);
+    *(.acfls_code_rom)
+    . = ALIGN(4);
+    acfls_code_rom_end = .;
+    KEEP(*(.acmem_43_infls_code_rom))
+    . = ALIGN(4);
+    acmem_43_infls_code_rom_end = .;
     *(.text*)                /* .text* sections (code) */
     *(.rodata)               /* .rodata sections (constants, strings, etc.) */
     *(.rodata*)              /* .rodata* sections (constants, strings, etc.) */
@@ -184,6 +193,11 @@ SECTIONS
   __VECTOR_RAM = DEFINED(__flash_vector_table__) ? ORIGIN(m_interrupts) : __VECTOR_RAM__ ;
   __RAM_VECTOR_TABLE_SIZE = DEFINED(__flash_vector_table__) ? 0x0 : (__interrupts_ram_end__ - __interrupts_ram_start__) ;
 
+  .acfls_code_ram :
+  {
+    . += (64);
+  } > m_data
+
   .data : AT(__DATA_ROM)
   {
     . = ALIGN(4);
@@ -238,6 +252,11 @@ SECTIONS
     __BSS_END = .;
   } > m_data_2
 
+  .acmem_43_infls_code_ram :
+  {
+    . += (acmem_43_infls_code_rom_end - acmem_43_infls_code_rom_start );
+  } > m_data_2
+
   .heap :
   {
     . = ALIGN(8);
@@ -270,8 +289,12 @@ SECTIONS
   /* Labels required by EWL */
   __START_BSS = __BSS_START;
   __END_BSS = __BSS_END;
-  __SP_INIT = __StackTop;  
-  
+  __SP_INIT = __StackTop;
+  WriteFuncAddress                     = 0x1FFF8000;
+  Mem_43_INFLS_ACWriteRomStart         = acmem_43_infls_code_rom_start;
+  Mem_43_INFLS_ACWriteRomEnd           = acmem_43_infls_code_rom_end;
+  Mem_43_INFLS_ACWriteSize             = ((acmem_43_infls_code_rom_end - acmem_43_infls_code_rom_start) + 3) / 4; /* Copy 4 bytes at a time*/
+
   .ARM.attributes 0 : { *(.ARM.attributes) }
 
   ASSERT(__StackLimit >= __HeapLimit, "region m_data_2 overflowed with stack and heap")

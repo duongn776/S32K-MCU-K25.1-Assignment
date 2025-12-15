@@ -21,7 +21,7 @@
 /*=============================================================================
  * Definitions
  *===========================================================================*/
-#define QUEUE_MAX_SIZE        16
+#define QUEUE_MAX_SIZE        30
 #define QUEUE_MAX_LINE_LEN    70
 #define NULL ((void *)0)
 #define true 1

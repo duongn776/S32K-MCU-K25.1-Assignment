@@ -1,28 +1,26 @@
-/*
- * Flash.h
- *
- *  Created on: Nov 20, 2025
- *      Author: nhduo
- */
+#if!defined (__FLASH_H__)
+#define __FLASH_H__
 
-#ifndef FLASH_H_
-#define FLASH_H_
 
 /*******************************************************************************
  * Includes
  ******************************************************************************/
-#include "S32K144.h"
+
 /*******************************************************************************
  * Defines
  ******************************************************************************/
 #define CMD_PROGRAM_LONGWORD     (0x07)
 #define CMD_ERASE_FLASH_SECTOR   (0x09)
-#define APP_SECTOR_COUNT    		(16u)
+#define APP_SECTOR_COUNT    	 (16u)
 /**
  * @brief  Program alignment
  */
 #define FTFC_WRITE_DOUBLE_WORD   (8U)
 #define FTFC_P_FLASH_SECTOR_SIZE (0x1000)
+#define WRITE_FUNCTION_ADDRESS    (0x1FFF8400)
+void Mem_43_INFLS_IPW_LoadAc(void);
+
+void Ftfc_AccessCode(void) __attribute__ ((section (".acmem_43_infls_code_rom")));
 /*******************************************************************************
  * API
  ******************************************************************************/
@@ -63,5 +61,4 @@ uint8_t Erase_Sector(uint32_t Addr);
  */
 uint8_t Erase_Multi_Sector(uint32_t Addr,uint8_t Size);
 
-
-#endif /* FLASH_H_ */
+#endif

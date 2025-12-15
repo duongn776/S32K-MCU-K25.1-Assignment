@@ -22,6 +22,7 @@
 #include "Srec_Parser.h"
 #include "Circular_Queue.h"
 #include "Flash.h"
+#include "s32_core_cm4.h"
 /*******************************************************************************
  * Definitions
  ******************************************************************************/
@@ -63,21 +64,20 @@ void Bootloader_Mode(void);
 void JumpToUserApp(void);
 
 /**
- * @brief Send a string over UART
+ * @brief Send a string over UART1
  *
- * @param s string to send
+ * @param s Pointer to the string to send
+ * @return None
  */
 void UART_SendString(const char *s)
 {
     Driver_USART1.Send(s, myStrlen(s));
 }
 
-/*******************************************************************************
- * Clock Configuration
- ******************************************************************************/
 /**
  * @brief Initialize System Oscillator (SOSC) at 8 MHz external crystal
  *
+ * @return None
  */
 void SOSC_init_8MHz(void)
 {
@@ -103,8 +103,9 @@ void SOSC_init_8MHz(void)
 
 
 /**
- * @brief  Initialize System PLL (SPLL) to generate 160 MHz
- *         SPLL_CLK = SOSC_CLK * (MULT + 16) / ((PREDIV + 1) * 2)
+ * @brief Initialize System PLL (SPLL) to generate 160 MHz system clock
+ *
+ * @return None
  */
 void SPLL_init_160MHz(void)
 {
@@ -134,11 +135,12 @@ void SPLL_init_160MHz(void)
     while (!(SCG->SPLLCSR & SCG_SPLLCSR_SPLLVLD_MASK));
 }
 
-/*******************************************************************************
- * Peripheral Initialization
- ******************************************************************************/
 /**
  * @brief Initialize push button on PC13 (active low)
+ *
+ * Configure GPIO pin PC13 as input with pull-up resistor.
+ *
+ * @return None
  */
 void Button_Init(void)
 {
@@ -147,12 +149,25 @@ void Button_Init(void)
     Driver_GPIO0.SetPullResistor(BTN1, ARM_GPIO_PULL_UP);
     Driver_GPIO0.SetEventTrigger(BTN1, ARM_GPIO_TRIGGER_NONE);
 }
+
+/**
+ * @brief UART1 interrupt callback
+ *
+ * Called when UART1 receives data. Handles line buffering and pushes
+ * complete SREC lines into circular queue.
+ *
+ * @param event UART event flags
+ * @return None
+ */
 void UART1_Callback(uint32_t event)
 {
+    /* Check if the receive complete event flag is set */
     if (event & ARM_USART_EVENT_RECEIVE_COMPLETE)
     {
+        /* If the received character is a newline or carriage return */
         if (uart_rx_char == '\r' || uart_rx_char == '\n')
         {
+            /* Only push if we have collected characters in the current line */
             if (line_index > 0)
             {
                 current_line[line_index] = '\0';
@@ -163,6 +178,7 @@ void UART1_Callback(uint32_t event)
         }
         else
         {
+            /* If not newline, append character to current line buffer */
             if (line_index < QUEUE_MAX_LINE_LEN - 1)
             {
                 current_line[line_index++] = uart_rx_char;
@@ -174,9 +190,12 @@ void UART1_Callback(uint32_t event)
 }
 
 
-
 /**
- * @brief Initialize UART1 at 115200 baud rate
+ * @brief Initialize UART1 peripheral
+ *
+ * Configure UART1 with baud rate, data bits, parity, stop bits.
+ *
+ * @return None
  */
 void UART_Init(void)
 {
@@ -191,44 +210,49 @@ void UART_Init(void)
     Driver_USART1.Control(ARM_USART_CONTROL_TX, 1u);
     Driver_USART1.Control(ARM_USART_CONTROL_RX, 1u);
 }
+
+/**
+ * @brief Handle a single SREC record
+ *
+ * Parse and program data from SREC record into flash memory.
+ *
+ * @param rec Pointer to SREC record structure
+ * @return true if SREC END record detected, false otherwise
+ */
 uint8_t Bootloader_HandleSrecRecord(const SREC_Record *rec)
 {
-	static uint8_t app_erased = 0;
+    uint8_t buf[8];        /* Temporary buffer for 8-byte flash programming */
+    uint32_t addr;         /* Current flash address to program */
+    uint8_t *pdata;        /* Pointer to record data */
+    uint32_t len;          /* Remaining length of data to program */
+    uint8_t chunk;         /* Size of current chunk (<= 8 bytes) */
 
     switch (rec->record_type)
     {
         case SREC_TYPE_S0:
-            /* Header file */
-        	return false;
+            /* S0 record: header information only, no programming required */
+            return false;
 
         case SREC_TYPE_S1:
         case SREC_TYPE_S2:
         case SREC_TYPE_S3:
         {
-        	if (!app_erased)
-        	{
-        	    UART_SendString("Erasing APP area...\r\n");
-        	    //Erase_Multi_Sector(APP_START_ADDR, APP_SECTOR_COUNT);
-        	    app_erased = 1;
-        	    UART_SendString("Erase done.\r\n");
-        	}
-            uint32_t addr  = rec->address;
-            uint8_t *pdata = (uint8_t*)rec->data;
-            uint32_t len   = rec->data_length;
+            /* S1/S2/S3 records: contain actual data to be programmed into flash */
 
+            addr  = rec->address;             /* Starting address */
+            pdata = (uint8_t*)rec->data;      /* Data pointer */
+            len   = rec->data_length;         /* Data length */
+
+            /* Program data into flash in 8-byte chunks */
             while (len > 0)
             {
-                uint8_t buf[8];
-                memset(buf, 0xFF, 8);
+                memset(buf, 0xFF, 8);         /* Fill buffer with default erased value */
+                chunk = (len >= 8) ? 8 : len; /* Determine chunk size */
+                memcpy(buf, pdata, chunk);    /* Copy data into buffer */
 
-                uint8_t chunk = (len >= 8) ? 8 : len;
-                memcpy(buf, pdata, chunk);
-
-                if (!Program_LongWord_8B(addr, buf))
-                {
-                    UART_SendString("FLASH WRITE ERROR\r\n");
-                    //break;
-                }
+                DISABLE_INTERRUPTS();
+                Program_LongWord_8B(addr, buf); /* Program 8 bytes into flash */
+                ENABLE_INTERRUPTS();
 
                 addr  += 8;
                 pdata += 8;
@@ -241,73 +265,114 @@ uint8_t Bootloader_HandleSrecRecord(const SREC_Record *rec)
         case SREC_TYPE_S7:
         case SREC_TYPE_S8:
         case SREC_TYPE_S9:
-        	/* Only signals that the SREC file has ended */
+            /* End-of-file records: indicate completion of SREC file */
             UART_SendString("SREC END DETECTED\r\n");
             return true;
 
         default:
+            /* Unknown record type */
             UART_SendString("Unknown SREC record\r\n");
             return false;
     }
 }
+
+
+/**
+ * @brief Enter Bootloader mode
+ *
+ * Initialize queues, receive SREC lines via UART, parse and flash them.
+ *
+ * @return None
+ */
 void Bootloader_Mode(void)
 {
+    uint8_t check;
     UART_SendString("\r\n=== BOOTLOADER MODE ===\r\n");
     UART_SendString("Send .SREC file via UART to update firmware.\r\n");
+
+    /* Initialize all circular queues used for buffering SREC lines */
     for (int i = 0; i < NUM_QUEUES; i++)
     {
-    	Queue_Init(&srecQueues[i]);
+        Queue_Init(&srecQueues[i]);
     }
+
     Driver_USART1.Receive(&uart_rx_char, 1);
 
     while (1)
     {
-                char srecLine[QUEUE_MAX_LINE_LEN];
-                if (Queue_Pop(&srecQueues[process_index], srecLine))
+        char srecLine[QUEUE_MAX_LINE_LEN];
+
+        /* Try to pop one complete line from the current queue */
+        if (Queue_Pop(&srecQueues[process_index], srecLine))
+        {
+            SREC_Record record;
+
+            /* Parse the line into an SREC record structure */
+            if (Srec_parse_line(srecLine, &record))
+            {
+                check = Bootloader_HandleSrecRecord(&record);
+
+                if (check)
                 {
-                    SREC_Record record;
-                    if (Srec_parse_line(srecLine, &record))
-                    {
-                    	UART_SendString("REC: ");
-                    	UART_SendString(srecLine);
-                    	UART_SendString("\r\n");
-                    }
+                    UART_SendString("\r\n=== FINISHED ===\r\n");
                 }
-                process_index = (process_index + 1) % NUM_QUEUES;
+            }
+        }
 
-   }
+        /* Move to the next queue index (round-robin scheduling) */
+        process_index = (process_index + 1) % NUM_QUEUES;
+    }
 }
-
 
 
 /**
  * @brief Jump to User Application located at APP_START_ADDR
+ *
+ * Set stack pointer and reset vector, then jump to UserApp entry point.
+ *
+ * @return None
  */
 void JumpToUserApp(void)
 {
     UART_SendString("Jumping to User Application...\r\n");
 
+    /* Read initial stack pointer value from the UserApp vector table */
     uint32_t appStack       = *((uint32_t *)APP_START_ADDR);
+
+    /* Read reset vector (entry point) from the UserApp vector table */
     uint32_t appResetVector = *((uint32_t *)(APP_START_ADDR + 4U));
+
+    /* Cast reset vector address to a function pointer */
     AppEntry_t appEntry     = (AppEntry_t)appResetVector;
 
-    /* Set vector table offset to the start of UserApp */
+    DISABLE_INTERRUPTS();
+
+    /* Redirect the vector table to the UserApp region */
     SCB->VTOR = APP_START_ADDR;
 
-    /* Set Main Stack Pointer */
+    /* Set the Main Stack Pointer (MSP) to the UserApp stack value */
     __set_MSP(appStack);
 
-    /* Jump to Application Reset Handler */
+    ENABLE_INTERRUPTS();
+
+    /* Jump to the UserApp entry point */
     appEntry();
 
     while (1);
 }
 
-/*******************************************************************************
- * Main Function
- ******************************************************************************/
+
+/**
+ * @brief Main entry point
+ *
+ * Initialize system clocks, UART, button. If button pressed → Bootloader mode.
+ * Otherwise → jump to User Application.
+ *
+ * @return int Always returns 0
+ */
 int main(void)
 {
+	static uint8_t app_erased = 0;
     /* Initialize system clock and peripherals */
     SOSC_init_8MHz();
     SPLL_init_160MHz();
@@ -315,13 +380,20 @@ int main(void)
     Button_Init();
 
     UART_SendString(MSG_READY);
-
+    Mem_43_INFLS_IPW_LoadAc();
 
     while (1)
     {
         if (Driver_GPIO0.GetInput(BTN1) == 0)
         {
             /* Button pressed → enter Bootloader mode */
+        	if (!app_erased)
+			{
+				UART_SendString("Erasing APP area...\r\n");
+				Erase_Multi_Sector(APP_START_ADDR, APP_SECTOR_COUNT);
+				app_erased = 1;
+				UART_SendString("Erase done.\r\n");
+			}
             UART_SendString(MSG_BOOT);
             Bootloader_Mode();
         }
@@ -331,9 +403,6 @@ int main(void)
             UART_SendString(MSG_APP);
             JumpToUserApp();
         }
-
-
-
     }
 
     return 0;

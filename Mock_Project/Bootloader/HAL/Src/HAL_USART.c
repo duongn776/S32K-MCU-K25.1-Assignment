@@ -10,6 +10,7 @@
 static void HAL_USART_EndTxTransfer(USART_HandleTypeDef *husart);
 static void HAL_USART_Transmit_TXE(USART_HandleTypeDef *husart);
 static void HAL_USART_Receive_RXNE(USART_HandleTypeDef *husart);
+
 /**
  * @brief Enable or disable the peripheral clock for the specified USART.
  * 
