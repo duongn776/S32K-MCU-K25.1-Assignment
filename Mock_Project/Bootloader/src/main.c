@@ -46,8 +46,9 @@ uint32_t line_index = 0;
 SrecQueue_t srecQueues[NUM_QUEUES];
 static volatile int curr_index = 0;
 static volatile int process_index = 0;
-
-
+static uint8_t buff[4];
+static uint8_t isAligned = 0U;
+static uint32_t addressAligned = 0U;
 
 /* Function pointer type for UserApp entry point */
 typedef void (*AppEntry_t)(void);
@@ -222,10 +223,12 @@ void UART_Init(void)
 uint8_t Bootloader_HandleSrecRecord(const SREC_Record *rec)
 {
     uint8_t buf[8];        /* Temporary buffer for 8-byte flash programming */
-    uint32_t addr;         /* Current flash address to program */
     uint8_t *pdata;        /* Pointer to record data */
     uint32_t len;          /* Remaining length of data to program */
     uint8_t chunk;         /* Size of current chunk (<= 8 bytes) */
+    uint32_t tempBuff;
+    uint8_t *ptemp;
+    uint32_t addr;
 
     switch (rec->record_type)
     {
@@ -246,16 +249,38 @@ uint8_t Bootloader_HandleSrecRecord(const SREC_Record *rec)
             /* Program data into flash in 8-byte chunks */
             while (len > 0)
             {
-                memset(buf, 0xFF, 8);         /* Fill buffer with default erased value */
-                chunk = (len >= 8) ? 8 : len; /* Determine chunk size */
-                memcpy(buf, pdata, chunk);    /* Copy data into buffer */
+                if (!(((addr & 0xC) == 0xC) || ((addr & 0x4) == 0x4)) && (len < 8))
+                {
+                    isAligned = 1U;
+                    memcpy(buff, buf, 4);         /* Fill buffer with existing flash data */
+                    chunk = 4;                   /* Determine chunk size */
+                    pdata += 4;
+                    addressAligned = addr;
+                }
+                else if (((addr & 0xC) == 0xC) || ((addr & 0x4) == 0x4))
+                {
+                    addr = addressAligned;                     /* Align address to 8-byte boundary */
+                    memcpy(buf, buff, 4);         /* Fill buffer with default erased value */
+                    memcpy(&buf[4], pdata, 4); /* Copy data into upper half */
+                    chunk =  4; /* Determine chunk size */
+                    pdata += 4;
+                    isAligned = 0U;
+                }
+                else
+                {
+                    memset(buf, 0xFF, 8);         /* Fill buffer with default erased value */
+                    chunk = (len >= 8) ? 8 : len; /* Determine chunk size */
+                    memcpy(buf, pdata, chunk);    /* Copy data into buffer */
+                    pdata += 8;
+                }
 
-                DISABLE_INTERRUPTS();
-                Program_LongWord_8B(addr, buf); /* Program 8 bytes into flash */
-                ENABLE_INTERRUPTS();
-
-                addr  += 8;
-                pdata += 8;
+                if (isAligned == 0U)
+                {
+                    DISABLE_INTERRUPTS();
+                    Program_LongWord_8B(addr, buf); /* Program 8 bytes into flash */
+                    ENABLE_INTERRUPTS();
+                    addr  += 8;
+                }
                 len   -= chunk;
             }
 
@@ -265,6 +290,14 @@ uint8_t Bootloader_HandleSrecRecord(const SREC_Record *rec)
         case SREC_TYPE_S7:
         case SREC_TYPE_S8:
         case SREC_TYPE_S9:
+            if(isAligned == 1U)
+            {
+                memset(&buff[4], 0xFF, 4);         /* Fill buffer with default erased value */
+                DISABLE_INTERRUPTS();
+                Program_LongWord_8B(addressAligned, buff); /* Program 8 bytes into flash */
+                ENABLE_INTERRUPTS();
+                isAligned = 0U;
+            }
             /* End-of-file records: indicate completion of SREC file */
             UART_SendString("SREC END DETECTED\r\n");
             return true;
@@ -334,31 +367,33 @@ void Bootloader_Mode(void)
  */
 void JumpToUserApp(void)
 {
-    UART_SendString("Jumping to User Application...\r\n");
+    static uint32_t appResetVector = 0;        /*This variable stores start address of new application*/
+    static uint32_t appStack = 0; /*This variable stores stack pointer initial value of new application*/
+    static void (*appEntry)(void) = 0;       /*This variable store the entry of new application*/
 
-    /* Read initial stack pointer value from the UserApp vector table */
-    uint32_t appStack       = *((uint32_t *)APP_START_ADDR);
+    /*Get start address of application*/
+    appResetVector = *(uint32_t *)(APP_START_ADDR + 4);
 
-    /* Read reset vector (entry point) from the UserApp vector table */
-    uint32_t appResetVector = *((uint32_t *)(APP_START_ADDR + 4U));
+    /*Get initial value of stack pointer*/
+    appStack = *(uint32_t *)APP_START_ADDR;
 
-    /* Cast reset vector address to a function pointer */
-    AppEntry_t appEntry     = (AppEntry_t)appResetVector;
-
+    /*Disable all current interrupts*/
     DISABLE_INTERRUPTS();
 
-    /* Redirect the vector table to the UserApp region */
-    SCB->VTOR = APP_START_ADDR;
+    /*Off set vector table*/
+    SCB->VTOR = (uint32_t)APP_START_ADDR;
 
-    /* Set the Main Stack Pointer (MSP) to the UserApp stack value */
+    /*Set initial stack pointer value*/
     __set_MSP(appStack);
+    __set_PSP(appStack);
 
-    ENABLE_INTERRUPTS();
+    /*Get new application entry*/
+    appEntry = (void (*)(void))appResetVector;
 
-    /* Jump to the UserApp entry point */
+    /*Jump to new application*/
     appEntry();
 
-    while (1);
+    return;
 }
 
 
@@ -390,7 +425,7 @@ int main(void)
         	if (!app_erased)
 			{
 				UART_SendString("Erasing APP area...\r\n");
-				Erase_Multi_Sector(APP_START_ADDR, APP_SECTOR_COUNT);
+				Erase_Multi_Sector(APP_START_ADDR, 16u);
 				app_erased = 1;
 				UART_SendString("Erase done.\r\n");
 			}

@@ -78,10 +78,6 @@ uint8_t Program_LongWord_8B(uint32_t Addr,uint8_t *Data)
     IP_FTFC->FCCOB[9]  = (uint8_t)(Data[5]);
     IP_FTFC->FCCOB[8]  = (uint8_t)(Data[4]);
 
-    while (IP_FTFC->FSTAT == 0x00);
-    IP_FTFC->FSTAT = 0x80;
-    asm("nop");
-    asm("nop");
     /* wait until operation finishes or write/erase timeout is reached */
     MEM_43_INFLS_AC_CALL(WRITE_FUNCTION_ADDRESS, Mem_43_INFLS_AcWritePtrType)();
 
@@ -107,10 +103,6 @@ uint8_t  Erase_Sector(uint32_t Addr)
     IP_FTFC->FCCOB[1] = (uint8_t)(Addr >> 8);
     IP_FTFC->FCCOB[0] = (uint8_t)(Addr >> 0);
 
-    while (IP_FTFC->FSTAT == 0x00);
-       IP_FTFC->FSTAT = 0x80;
-       asm("nop");
-       asm("nop");
     /* wait until operation finishes or write/erase timeout is reached */
     MEM_43_INFLS_AC_CALL(WRITE_FUNCTION_ADDRESS, Mem_43_INFLS_AcWritePtrType)();
     return 1;
