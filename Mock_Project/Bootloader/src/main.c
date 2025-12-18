@@ -226,8 +226,6 @@ uint8_t Bootloader_HandleSrecRecord(const SREC_Record *rec)
     uint8_t *pdata;        /* Pointer to record data */
     uint32_t len;          /* Remaining length of data to program */
     uint8_t chunk;         /* Size of current chunk (<= 8 bytes) */
-    uint32_t tempBuff;
-    uint8_t *ptemp;
     uint32_t addr;
 
     switch (rec->record_type)
@@ -252,7 +250,7 @@ uint8_t Bootloader_HandleSrecRecord(const SREC_Record *rec)
                 if (!(((addr & 0xC) == 0xC) || ((addr & 0x4) == 0x4)) && (len < 8))
                 {
                     isAligned = 1U;
-                    memcpy(buff, buf, 4);         /* Fill buffer with existing flash data */
+                    memcpy(buff, pdata, 4);         /* Fill buffer with existing flash data */
                     chunk = 4;                   /* Determine chunk size */
                     pdata += 4;
                     addressAligned = addr;
